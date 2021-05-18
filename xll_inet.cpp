@@ -1,16 +1,59 @@
-// xllinet.cpp - WinInet wrappers
-#include "inet.h"
-#include "xll/xll.h"
+// xll_inet.cpp - WinInet wrappers
+#include "xll_inet.h"
 
-#ifndef CATEGORY
-#define CATEGORY L"INET"
-#endif
-#define INET_AGENT L"xllinet"
-using xcstr = const WCHAR*;
-
-using namespace Win;
 using namespace xll;
 
+char buf[0x7FFF];
+
+AddIn xai_inet_read_file(
+    Function(XLL_LPOPER, "xll_inet_read_file", "INET.READ.FILE")
+    .Arguments({
+        Arg(XLL_CSTRING, "url", "is a URL to read."),
+        Arg(XLL_PSTRING, "_headers", "are optional headers to send to the HTTP server."),
+        })
+    .Category(CATEGORY)
+    .FunctionHelp("Return the data from url.")
+    .Documentation(R"(
+What <code>WEBSERVICE</code> should be.
+)")
+);
+LPOPER WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
+{
+#pragma XLLEXPORT
+    static OPER result;
+
+    try {
+        DWORD flags = 0;
+        DWORD_PTR context = NULL;
+        Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, headers + 1, headers[0], flags, context));
+        DWORD len;
+        result = Nil;
+        DWORD off = 0;
+        while (InternetReadFile(hurl, buf + off, sizeof(buf) - off - 1, &len) and len != 0) {
+            char* b = buf;
+            while (char* e = strchr(b, '\n')) {
+                if (e - b >= sizeof(buf)) {
+                    break;
+                }
+                *e = 0;
+                result.push_back(OPER(b));
+                b = e + 1;
+            }
+            off = static_cast<DWORD>(buf + sizeof(buf) - b);
+            memcpy(buf, b, off);
+        }
+        buf[len] = 0;
+        result.push_back(OPER(buf + off));
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+    }
+
+    return &result;
+}
+
+
+#if 0
 AddIn xai_inet_open(
     Function(XLL_HANDLE, L"?xll_inet_open", L"INET.OPEN")
     .Arg(XLL_CSTRING, L"agent", L"is the http user agent.")
@@ -36,59 +79,6 @@ HANDLEX WINAPI xll_inet_open(xcstr agent)
     return h;
 }
 
-AddIn xai_inet_open_url(
-    Function(XLL_HANDLE, L"?xll_inet_open_url", L"INET.OPEN.URL")
-    .Arg(XLL_HANDLE, L"open", L"is a handle returned by INET.OPEN.")
-    .Arg(XLL_CSTRING, L"url", L"is the universal resource locator to open.")
-    .Arg(XLL_CSTRING, L"headers", L"are option headers to send to the HTTP server.")
-    .Uncalced()
-    .Category(CATEGORY)
-    .FunctionHelp(L"Return an internet open_urlion handle.")
-);
-HANDLEX WINAPI xll_inet_open_url(HANDLEX open, xcstr url, xcstr headers)
-{
-#pragma XLLEXPORT
-    handlex h;
-
-    try {
-        handle<Internet::Open> open_(open);
-        ensure(open_);
-        handle<Internet::OpenUrl> url_(new Internet::OpenUrl(*open_, url, headers));
-        h = url_.get();
-    }
-    catch (const std::exception& ex) {
-        XLL_ERROR(ex.what());
-    }
-
-    return h;
-}
-
-AddIn xai_inet_read_file(
-    Function(XLL_LPOPER, L"?xll_inet_read_file", L"INET.READ.FILE")
-    .Arg(XLL_HANDLE, L"url", L"is a handle returned by INET.OPEN.URL.")
-    .Category(CATEGORY)
-    .FunctionHelp(L"Return the data from url.")
-);
-LPOPER WINAPI xll_inet_read_file(HANDLEX url)
-{
-#pragma XLLEXPORT
-    static OPER result;
-
-    try {
-        handle<Internet::OpenUrl> url_(url);
-        ensure(url_);
-        auto query = url_->ReadFile();
-        if (query.has_value())
-            result = query.value().c_str();
-        else
-            result = OPER(xlerr::NA);
-    }
-    catch (const std::exception& ex) {
-        XLL_ERROR(ex.what());
-    }
-
-    return &result;
-}
 
 AddIn xai_inet_connect(
     Function(XLL_HANDLE, L"?xll_inet_connect", L"INET.CONNECT")
@@ -221,3 +211,4 @@ test test_xll_inet([] {
 });
 
 #endif // _DEBUG
+#endif // 0

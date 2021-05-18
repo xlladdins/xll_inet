@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="inet.h">
+    <ClInclude Include="xll_inet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
