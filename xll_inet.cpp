@@ -3,55 +3,75 @@
 
 using namespace xll;
 
-char buf[0x7FFF];
-
 AddIn xai_inet_read_file(
-    Function(XLL_LPOPER, "xll_inet_read_file", "INET.READ.FILE")
+    Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.FILE")
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_PSTRING, "_headers", "are optional headers to send to the HTTP server."),
         })
+    .Uncalced()
     .Category(CATEGORY)
     .FunctionHelp("Return the data from url.")
     .Documentation(R"(
 What <code>WEBSERVICE</code> should be.
 )")
 );
-LPOPER WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
+HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
 {
 #pragma XLLEXPORT
-    static OPER result;
+    HANDLEX h = INVALID_HANDLEX;
 
     try {
+        handle<Inet::MapFile> h_(new Inet::MapFile);
+        
         DWORD flags = 0;
         DWORD_PTR context = NULL;
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, headers + 1, headers[0], flags, context));
-        DWORD len;
-        result = Nil;
-        DWORD off = 0;
-        while (InternetReadFile(hurl, buf + off, sizeof(buf) - off - 1, &len) and len != 0) {
-            char* b = buf;
-            while (char* e = strchr(b, '\n')) {
-                if (e - b >= sizeof(buf)) {
-                    break;
-                }
-                *e = 0;
-                result.push_back(OPER(b));
-                b = e + 1;
-            }
-            off = static_cast<DWORD>(buf + sizeof(buf) - b);
-            memcpy(buf, b, off);
+ 
+        DWORD len = 4096;
+        char* buf = *h_;
+        while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
+            buf += len;
         }
-        buf[len] = 0;
-        result.push_back(OPER(buf + off));
+        h = h_.get();
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
     }
 
-    return &result;
+    return h;
 }
 
+AddIn xai_inet_file(
+    Function(XLL_LPOPER, "xll_inet_file", "INET.FILE")
+    .Arguments({
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.FILE"),
+        Arg(XLL_LONG, "_offset", "is the file offset."),
+        Arg(XLL_LONG, "_count", "is the number of characters to return.")
+        })
+    .FunctionHelp("Return substring of file.")
+    .Category(CATEGORY)
+);
+LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
+{
+#pragma XLLEXPORT
+    static OPER result;
+
+    try {
+        handle<Inet::MapFile> h_(h);
+        if (len == 0) {
+            len = 0xFFFF;
+        }
+        result = OPER((char*)*h_ + off, len);
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        result = ErrNA;
+    }
+
+    return &result;
+}
 
 #if 0
 AddIn xai_inet_open(
