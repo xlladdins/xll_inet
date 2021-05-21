@@ -33,6 +33,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
             buf += len;
         }
+        *++buf = 0; // null terminate
         h = h_.get();
     }
     catch (const std::exception& ex) {
@@ -60,7 +61,7 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     try {
         handle<Inet::MapFile> h_(h);
         if (len == 0) {
-            len = 0xFFFF;
+            len = -1;
         }
         result = OPER((char*)*h_ + off, len);
     }
