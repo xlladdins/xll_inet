@@ -19,25 +19,19 @@ namespace Inet {
 	inline HInet hInet = InternetOpen(_T("Xll_" CATEGORY), INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
 
 	// memory mapped file class
-	class MapFile {
+	class MapFile : public xll::view<char> {
 		Win::Handle h;
-		LPVOID p;
 	public:
 		MapFile(DWORD len = 1<<20)
 			: h(CreateFileMapping(INVALID_HANDLE_VALUE, 0, PAGE_READWRITE, 0, len, nullptr))
 		{
-			p = MapViewOfFile(h, FILE_MAP_ALL_ACCESS, 0, 0, len);
+			ptr((char*)MapViewOfFile(h, FILE_MAP_ALL_ACCESS, 0, 0, len));
 		}
 		MapFile(const MapFile&) = delete;
 		MapFile& operator=(const MapFile&) = delete;
 		~MapFile()
 		{
-			UnmapViewOfFile(p);
-		}
-		template<class T>
-		operator T*()
-		{
-			return (T*)p;
+			UnmapViewOfFile(ptr());
 		}
 	};
 

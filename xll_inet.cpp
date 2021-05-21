@@ -11,9 +11,9 @@ AddIn xai_inet_read_file(
         })
     .Uncalced()
     .Category(CATEGORY)
-    .FunctionHelp("Return the data from url.")
+    .FunctionHelp("Return a handle to the data from url.")
     .Documentation(R"(
-What <code>WEBSERVICE</code> should be.
+Read all url data into memory.
 )")
 );
 HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
@@ -22,18 +22,19 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
     HANDLEX h = INVALID_HANDLEX;
 
     try {
-        handle<Inet::MapFile> h_(new Inet::MapFile);
+        handle<view<char>> h_(new Inet::MapFile);
         
         DWORD flags = 0;
         DWORD_PTR context = NULL;
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, headers + 1, headers[0], flags, context));
  
-        DWORD len = 4096;
+        DWORD len = 4096; // ??? page size
         char* buf = *h_;
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
+            h_->size(h_->size() + len);
             buf += len;
         }
-        *++buf = 0; // null terminate
+
         h = h_.get();
     }
     catch (const std::exception& ex) {
@@ -48,10 +49,13 @@ AddIn xai_inet_file(
     .Arguments({
         Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.FILE"),
         Arg(XLL_LONG, "_offset", "is the file offset."),
-        Arg(XLL_LONG, "_count", "is the number of characters to return.")
+        Arg(XLL_LONG, "_length", "is the number of characters to return.")
         })
     .FunctionHelp("Return substring of file.")
     .Category(CATEGORY)
+    .Documentation(R"xyzyx(
+Return data returned by <code>\INET.FILE</code>.
+)xyzyx")
 );
 LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
 {
@@ -59,11 +63,13 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     static OPER result;
 
     try {
-        handle<Inet::MapFile> h_(h);
-        if (len == 0) {
-            len = -1;
+        handle<view<char>> h_(h);
+
+        if (len == 0 or len > static_cast<LONG>(h_->size()) - off) {
+            len = h_->size() - off;
         }
-        result = OPER((char*)*h_ + off, len);
+
+        result = OPER(*h_ + off, len);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
