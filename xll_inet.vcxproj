@@ -166,6 +166,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="fms_ntp.h" />
     <ClInclude Include="pugixml-1.11\src\pugiconfig.hpp" />
     <ClInclude Include="pugixml-1.11\src\pugixml.hpp" />
     <ClInclude Include="xll_inet.h" />

@@ -22,7 +22,7 @@ HANDLEX WINAPI xll_xml_document(HANDLEX h)
 
 	try {
 		handle<xml_document> doc_(new xml_document);
-		handle<view<char>> h_(h); //!!! replace by generic buffer
+		handle<utf8::view<char>> h_(h); //!!! replace by generic buffer
 
 		xml_parse_result result = doc_->load_buffer_inplace(*h_, h_->size());
 		doc = doc_.get();

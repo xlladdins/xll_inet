@@ -291,3 +291,4 @@ __pycache__/
 /pugixml-1.11/scripts/pugixml.xcodeproj
 /pugixml-1.11/scripts/natvis
 /pugixml-1.11/scripts
+/pugixml-1.11/out/build/x64-Debug

@@ -22,7 +22,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
     HANDLEX h = INVALID_HANDLEX;
 
     try {
-        handle<view<char>> h_(new Inet::MapFile);
+        handle<utf8::view<char>> h_(new utf8::mem_view);
         
         DWORD flags = 0;
         DWORD_PTR context = NULL;
@@ -63,7 +63,7 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     static OPER result;
 
     try {
-        handle<view<char>> h_(h);
+        handle<utf8::view<char>> h_(h);
 
         if (len == 0 or len > static_cast<LONG>(h_->size()) - off) {
             len = h_->size() - off;
