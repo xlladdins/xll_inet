@@ -30,6 +30,9 @@
     <ClInclude Include="fms_ntp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="xll_csv.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp">
@@ -42,6 +45,9 @@
       <Filter>pugixml</Filter>
     </ClCompile>
     <ClCompile Include="xll_xml.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="xll_csv.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

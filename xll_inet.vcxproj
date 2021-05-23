@@ -169,11 +169,13 @@
     <ClInclude Include="fms_ntp.h" />
     <ClInclude Include="pugixml-1.11\src\pugiconfig.hpp" />
     <ClInclude Include="pugixml-1.11\src\pugixml.hpp" />
+    <ClInclude Include="xll_csv.h" />
     <ClInclude Include="xll_inet.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp" />
     <ClCompile Include="pugixml-1.11\src\pugixml.cpp" />
+    <ClCompile Include="xll_csv.cpp" />
     <ClCompile Include="xll_inet.cpp" />
     <ClCompile Include="xll_xml.cpp" />
   </ItemGroup>
