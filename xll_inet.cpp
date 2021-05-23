@@ -3,11 +3,39 @@
 
 using namespace xll;
 
+// convert two columns range into "key: value\r\n ..."
+inline OPER headers(const OPER& o)
+{
+    OPER h;
+
+    if (o.is_missing()) {
+        h = "";
+    }
+    else if (o.is_str()) {
+        h = o;
+    }
+    else if (o.is_multi()){
+        ensure(o.columns() == 2);
+        OPER sc(": ");
+        OPER rn("\r\n");
+        for (unsigned i = 0; i < o.rows(); ++i) {
+            h &= o(i, 0) & sc & o(i, 1) & rn;
+        }
+        h &= rn;
+    }
+    else {
+        ensure(!"xll::headers: must be mising, string, or two column range");
+        h = ErrNA;
+    }
+
+    return h;
+}
+
 AddIn xai_inet_read_file(
     Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.FILE")
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
-        Arg(XLL_PSTRING, "_headers", "are optional headers to send to the HTTP server."),
+        Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
         })
     .Uncalced()
     .Category(CATEGORY)
@@ -16,7 +44,7 @@ AddIn xai_inet_read_file(
 Read all url data into memory.
 )")
 );
-HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
+HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
 {
 #pragma XLLEXPORT
     HANDLEX h = INVALID_HANDLEX;
@@ -26,7 +54,8 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPCTSTR headers)
         
         DWORD flags = 0;
         DWORD_PTR context = NULL;
-        Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, headers + 1, headers[0], flags, context));
+        OPER head = headers(*pheaders);
+        Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
  
         DWORD len = 4096; // ??? page size
         char* buf = *h_;
