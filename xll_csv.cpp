@@ -53,6 +53,10 @@ int test_csv_parse()
 
 		xcstr buf = _T("ab,cd\r\ne,fg");
 		OPER o = csv_parse(buf);
+		ensure(o.rows() == 2);
+		ensure(o.columns() == 2);
+		ensure(o(0, 0) == OPER(_T("ab")));
+		ensure(o(1, 1) == OPER(_T("fg")));
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

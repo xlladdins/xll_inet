@@ -16,6 +16,9 @@ namespace xll {
 		T* buf;
 		DWORD len;
 
+		item()
+			: buf(nullptr), len(0)
+		{ }
 		item(T* buf, DWORD len)
 			: buf(buf), len(len)
 		{ }
@@ -87,6 +90,11 @@ namespace xll {
 			{
 				item i(_T("abc"));
 				ensure(i.len == 4);
+				ensure(trim(i) == item(_T("abc")));
+			}
+			{
+				item i(_T(" abc "));
+				ensure(i.len == 6);
 				ensure(trim(i) == item(_T("abc")));
 			}
 		}
@@ -179,8 +187,6 @@ namespace xll {
 		xchar fs = _T(','), xcstr rs = _T("\r\n"), xchar esc = _T('\"'))
 	{
 		if (csv_eol(csv, rs)) {
-			csv = csv_eol(csv, rs);
-
 			return item(csv, 0);
 		}
 
@@ -233,12 +239,10 @@ namespace xll {
 	{
 		try {
 			ensure(csv_field_parse(item(_T("abc"))) == OPER("abc"));
-			/*
-			ensure(csv_field_parse(sv(_T(" abc "))) == OPER("abc"));
-			ensure(csv_field_parse(sv(_T("1.23"))) == OPER(1.23));
-			ensure(csv_field_parse(sv(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
-			ensure(csv_field_parse(sv(_T("tRue"))) == OPER(true));
-			*/
+			ensure(csv_field_parse(item(_T(" abc "))) == OPER("abc"));
+			ensure(csv_field_parse(item(_T("1.23"))) == OPER(1.23));
+			ensure(csv_field_parse(item(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
+			ensure(csv_field_parse(item(_T("tRue"))) == OPER(true));
 		}
 		catch (const std::exception& ex) {
 			XLL_ERROR(ex.what());
