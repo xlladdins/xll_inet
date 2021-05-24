@@ -3,7 +3,6 @@
 #include "xll/xll/xll.h"
 #include "xll/xll/win.h"
 #include <wininet.h>
-#include <memoryapi.h>
 
 #pragma comment(lib, "Wininet.lib")
 
