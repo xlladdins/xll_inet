@@ -32,17 +32,20 @@ inline OPER headers(const OPER& o)
 }
 
 AddIn xai_inet_read_file(
-    Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.FILE")
+    Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.READ")
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
         })
     .Uncalced()
     .Category(CATEGORY)
-    .FunctionHelp("Return a handle to the data from url.")
-    .Documentation(R"(
-Read all url data into memory.
-)")
+    .FunctionHelp("Return a handle to the string returned by url.")
+    .Documentation(R"xyzyx(
+Read all url data into memory using
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla">InternetOpenUrl</a>
+and
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile">InternetReadFile</a>.
+)xyzyx")
 );
 HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
 {
@@ -74,16 +77,16 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
 }
 
 AddIn xai_inet_file(
-    Function(XLL_LPOPER, "xll_inet_file", "INET.FILE")
+    Function(XLL_LPOPER, "xll_inet_file", "STR.GET")
     .Arguments({
-        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.FILE"),
-        Arg(XLL_LONG, "_offset", "is the file offset."),
-        Arg(XLL_LONG, "_length", "is the number of characters to return.")
+        Arg(XLL_HANDLEX, "handle", "is a handle to a string."),
+        Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
+        Arg(XLL_LONG, "_length", "is the number of characters to return. Default is all.")
         })
     .FunctionHelp("Return substring of file.")
     .Category(CATEGORY)
     .Documentation(R"xyzyx(
-Return data returned by <code>\INET.FILE</code>.
+Get a string returned by <code>\INET.READ</code>.
 )xyzyx")
 );
 LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
