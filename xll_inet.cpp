@@ -24,7 +24,7 @@ inline OPER headers(const OPER& o)
         h &= rn;
     }
     else {
-        ensure(!"xll::headers: must be mising, string, or two column range");
+        ensure(!"xll::headers: must be missing, string, or two column range");
         h = ErrNA;
     }
 
@@ -53,7 +53,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
     HANDLEX h = INVALID_HANDLEX;
 
     try {
-        handle<utf8::view<char>> h_(new utf8::mem_view);
+        handle<view<char>> h_(new mem_view);
         
         DWORD flags = 0;
         DWORD_PTR context = NULL;
@@ -61,9 +61,9 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
  
         DWORD len = 4096; // ??? page size
-        char* buf = *h_;
+        char* buf = h_->buf;
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
-            h_->size(h_->size() + len);
+            h_->len += len;
             buf += len;
         }
 
@@ -95,13 +95,13 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     static OPER result;
 
     try {
-        handle<utf8::view<char>> h_(h);
+        handle<view<char>> h_(h);
 
-        if (len == 0 or len > static_cast<LONG>(h_->size()) - off) {
-            len = h_->size() - off;
+        if (len == 0 or len > static_cast<LONG>(h_->len) - off) {
+            len = h_->len - off;
         }
 
-        result = OPER(*h_ + off, len);
+        result = OPER(h_->buf + off, len);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
