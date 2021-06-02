@@ -8,12 +8,12 @@ AddIn xai_csv_parse(
 	.Arguments({
 		Arg(XLL_CSTRING, "string", "is a string of comma separated values."),
 		Arg(XLL_CSTRING, "_fs", "is the optional field separator. Default is ','."),
-		Arg(XLL_CSTRING, "_rs", "is the optional record separator. Default is ';'."),
+		Arg(XLL_CSTRING, "_rs", "is the optional record separator. Default is '\\r\\n'."),
 		Arg(XLL_CSTRING, "_esc", "is the optional escape character. Default is '\"'."),
 		})
 	.FunctionHelp("Parse CSV string into a range.")
 	.Category("CSV")
-	.Documentation(R"()")
+	.Documentation(R"xyzyx()xyzyx")
 );
 LPOPER WINAPI xll_csv_parse(xcstr csv, xcstr fs, xcstr rs, xcstr esc)
 {
@@ -25,7 +25,7 @@ LPOPER WINAPI xll_csv_parse(xcstr csv, xcstr fs, xcstr rs, xcstr esc)
 			fs = _T(",");
 		}
 		if (!*rs) {
-			rs = _T(";");
+			rs = _T("\\r\\n");
 		}
 		if (!*esc) {
 			esc = _T("\"");
