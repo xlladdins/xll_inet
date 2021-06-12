@@ -137,6 +137,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/J /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -157,6 +158,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/J /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -172,8 +174,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp" />
+    <ClCompile Include="pugixml-1.11\src\pugixml.cpp" />
     <ClCompile Include="xll_csv.cpp" />
     <ClCompile Include="xll_inet.cpp" />
+    <ClCompile Include="xll_xml.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="xll\xll.vcxproj">
