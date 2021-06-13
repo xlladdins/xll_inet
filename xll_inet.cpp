@@ -3,6 +3,33 @@
 
 using namespace xll;
 
+#define INTERNET_FLAG(X) \
+X(INTERNET_FLAG_EXISTING_CONNECT, "Attempts to use an existing InternetConnect object if one exists with the same attributes required to make the request.") \
+X(INTERNET_FLAG_HYPERLINK, "Forces a reload if there was no Expires timeand no LastModified time returned from the server when determining whether to reload the item from the network.") \
+X(INTERNET_FLAG_IGNORE_CERT_CN_INVALID, "Disables checking of SSL/PCT-based certificates that are returned from the server against the host namegiven in the request.WinINet functions use a simple check against certificates by comparing for matching host namesand simple wildcarding rules.") \
+X(INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, "Disables checking of SSL/PCT - based certificates for proper validity dates.") \
+X(INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTP, "Disables detection of this special type of redirect.When this flag is used, WinINet transparently allows redirects from HTTPS to HTTP URLs.") \
+X(INTERNET_FLAG_IGNORE_REDIRECT_TO_HTTPS, "Disables the detection of this special type of redirect.When this flag is used, WinINet transparently allows redirects from HTTP to HTTPS URLs.") \
+X(INTERNET_FLAG_KEEP_CONNECTION, "Uses keep - alive semantics, if available, for the connection.This flag is required for Microsoft Network(MSN), NTLM, and other types of authentication.") \
+X(INTERNET_FLAG_NEED_FILE, "Causes a temporary file to be created if the file cannot be cached.") \
+X(INTERNET_FLAG_NO_AUTH, "Does not attempt authentication automatically.") \
+X(INTERNET_FLAG_NO_AUTO_REDIRECT, "Does not automatically handle redirection in HttpSendRequest.") \
+X(INTERNET_FLAG_NO_CACHE_WRITE, "Does not add the returned entity to the cache.") \
+X(INTERNET_FLAG_NO_COOKIES, "Does not automatically add cookie headers to requests, and does not automatically add returned cookies to the cookie database.") \
+X(INTERNET_FLAG_NO_UI, "Disables the cookie dialog box.") \
+X(INTERNET_FLAG_PASSIVE, "Uses passive FTP semantics.InternetOpenUrl uses this flag for FTP filesand directories.") \
+X(INTERNET_FLAG_PRAGMA_NOCACHE, "Forces the request to be resolved by the origin server, even if a cached copy exists on the proxy.") \
+X(INTERNET_FLAG_RAW_DATA, "Returns the data as a WIN32_FIND_DATA structure when retrieving FTP directory information.If this flag is not specified or if the call was made through a CERN proxy, InternetOpenUrl returns the HTML version of the directory.") \
+X(INTERNET_FLAG_RELOAD, "Forces a download of the requested file, object, or directory listing from the origin server, not from the cache.") \
+X(INTERNET_FLAG_RESYNCHRONIZE, "Reloads HTTP resources if the resource has been modified since the last time it was downloaded.All FTP resources are reloaded.") \
+X(INTERNET_FLAG_SECURE, "Uses secure transaction semantics.This translates to using Secure Sockets Layer/Private Communications Technology(SSL /PCT) and is only meaningful in HTTP requests.") \
+
+#define TOPIC "https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla"
+#define X(a, b) XLL_CONST(LONG, ##a, ##a, b, CATEGORY, TOPIC)
+INTERNET_FLAG(X)
+#undef INTERNET_FLAGS_TOPIC
+#undef X
+
 // convert two columns range into "key: value\r\n ..."
 inline OPER headers(const OPER& o)
 {
@@ -36,6 +63,7 @@ AddIn xai_inet_read_file(
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
+        Arg(XLL_LONG, "_flags", "are optional flags from INTERNET_FLAGS_*. Default is 0.")
         })
     .Uncalced()
     .Category(CATEGORY)
@@ -47,7 +75,7 @@ and
 <a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile">InternetReadFile</a>.
 )xyzyx")
 );
-HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
+HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 {
 #pragma XLLEXPORT
     HANDLEX h = INVALID_HANDLEX;
@@ -55,7 +83,6 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders)
     try {
         handle<view<char>> h_(new mem_view);
         
-        DWORD flags = 0;
         DWORD_PTR context = NULL;
         OPER head = headers(*pheaders);
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));

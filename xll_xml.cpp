@@ -26,7 +26,10 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str)
 		// Makes a copy of buf. Consider using load_buffer_inplace.
 		xml_parse_result result = h_->load_buffer(str_->buf, str_->len);
 		if (!result) {
-			XLL_WARNING(result.description());
+			std::string err = "\\XML.DOCUMENT: parse error: >";
+			err += std::string(str_->buf + result.offset, 20);
+			err += "<...";
+			XLL_WARNING(err.c_str());
 		}
 
 		h = h_.get();
@@ -66,3 +69,23 @@ HANDLEX WINAPI xll_xml_xpath(HANDLEX doc, const char* xpath)
 
 	return h;
 }
+
+#ifdef _DEBUG
+
+int test_xml()
+{
+	try {
+		OPER o = Excel(xlUDF, OPER("\\INET.READ"), OPER("https://xlladdins.com"));
+		OPER doc = Excel(xlUDF, OPER("\\XML.DOCUMENT"), o);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+Auto<OpenAfter> xaoa_test_xml(test_xml);
+
+#endif // _DEBUG
