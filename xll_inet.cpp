@@ -104,16 +104,16 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 }
 
 AddIn xai_inet_file(
-    Function(XLL_LPOPER, "xll_inet_file", "STR.GET")
+    Function(XLL_LPOPER, "xll_inet_file", "INET.GET")
     .Arguments({
-        Arg(XLL_HANDLEX, "handle", "is a handle to a string."),
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.READ."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
         Arg(XLL_LONG, "_length", "is the number of characters to return. Default is all.")
         })
     .FunctionHelp("Return substring of file.")
     .Category(CATEGORY)
     .Documentation(R"xyzyx(
-Get a string returned by <code>\INET.READ</code>.
+Get characters returned by <code>\INET.READ</code>.
 )xyzyx")
 );
 LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
