@@ -18,6 +18,10 @@ using namespace xll;
 		X(declaration,	"Document declaration, i.e. '<?xml version=\"1.0\"?>'") \
 		X(doctype,		"Document type declaration, i.e. '<!DOCTYPE doc>'") \
 
+#define XML_NODE_ENUM(a, b) XLL_CONST(WORD, XML_NODE_ ## a, xml_node_type::node_##a, b, CATEGORY, "")
+XML_NODE_TYPE(XML_NODE_ENUM)
+#undef XML_NODE_ENUM
+
 // use internal object pointer to node struct
 inline xml_node to_node(HANDLEX h)
 {
@@ -57,7 +61,7 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str)
 			XLL_WARNING(err.c_str());
 		}
 
-		h = from_node(*h_);
+		h = h_.get();
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -74,7 +78,7 @@ int test_xml_document()
 		OPER o = Excel(xlUDF, OPER("\\INET.READ"), OPER("https://google.com"));
 		OPER doc = Excel(xlUDF, OPER("\\XML.DOCUMENT"), o);
 		ensure(doc.is_num());
-		xml_node node(to_pointer<xml_node_struct>(doc.val.num));
+		xml_node node = to_node(doc.val.num);
 		ensure(node.type() == xml_node_type::node_document);
 	}
 	catch (const std::exception& ex) {
@@ -175,7 +179,9 @@ AddIn xai_xml_node_text(
 		})
 		.Category(CATEGORY)
 	.FunctionHelp("Return text of a node.")
-	.Documentation(R"()")
+	.Documentation(R"(
+Get text from <code>cdata</code> or <code>pcdata</code> node.
+)")
 );
 LPOPER WINAPI xll_xml_node_text(HANDLEX h)
 {
@@ -183,7 +189,35 @@ LPOPER WINAPI xll_xml_node_text(HANDLEX h)
 	static OPER o;
 
 	try {
-		o = to_node(h).text();
+		xml_node node = to_node(h);
+		ensure(node.type() == xml_node_type::node_cdata or node.type() == xml_node_type::node_pcdata);
+		o = node.text().get();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_path(
+	Function(XLL_LPOPER, "xll_xml_node_path", "XML.NODE.PATH")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return path of a node.")
+	.Documentation(R"(
+Full path to node in XML document.
+)")
+);
+LPOPER WINAPI xll_xml_node_path(HANDLEX h)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = to_node(h).path().c_str();
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -199,7 +233,10 @@ AddIn xai_xml_node_attributes(
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return two column range of all attributes of a node.")
-	.Documentation(R"()")
+	.Documentation(R"(
+Return range of attribute keys in first column with corresponding
+attribute values in the second column.
+)")
 );
 LPOPER WINAPI xll_xml_node_attributes(HANDLEX h)
 {
@@ -249,13 +286,15 @@ LPOPER WINAPI xll_xml_node_children(HANDLEX h)
 AddIn xai_xpath_node_set(
 	Function(XLL_HANDLEX, "xll_xpath_node_set", "\\XPATH.NODE_SET")
 	.Arguments({
-		Arg(XLL_HANDLEX, "doc", "is a handle to an xpath_node_set."),
+		Arg(XLL_HANDLEX, "doc", "is a handle to a XML document."),
 		Arg(XLL_CSTRING4, "query", "is an XPath query."),
 		})
 	.Uncalced()
 	.Category("XML")
 	.FunctionHelp("Return handle to an XPath node set matching query.")
-	.Documentation(R"()")
+	.Documentation(R"(
+Return a handle to all nodes in <code>doc</code> matching <code>query</code>.
+)")
 );
 HANDLEX WINAPI xll_xpath_node_set(HANDLEX doc, const char* xpath)
 {
@@ -264,11 +303,10 @@ HANDLEX WINAPI xll_xpath_node_set(HANDLEX doc, const char* xpath)
 
 	try {
 		handle<xml_document> doc_(doc);
-		ensure(doc_);
-		xml_attribute a;
-		handle<xpath_node_set> set_(new xpath_node_set(doc_->select_nodes(xpath)));
-
-		h = set_.get();
+		if (doc_) {
+			handle<xpath_node_set> set_(new xpath_node_set(doc_->select_nodes(xpath)));
+			h = set_.get();
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -304,13 +342,14 @@ LONG WINAPI xll_xpath_node_set_size(HANDLEX nodes)
 }
 
 AddIn xai_xpath_node_set_nodes(
-	Function(XLL_LPOPER, "xll_xpath_node_set_nodes", "XPATH.NODE_SET.NODES")
+	Function(XLL_LPOPER, "xll_xpath_node_set_nodes", "XPATH.NODE_SET.XPATH_NODES")
 	.Arguments({
 		Arg(XLL_HANDLEX, "nodes", "is a handle returned by \\XPATH.NODE_SET."),
 		})
-		.Category("XML")
-	.FunctionHelp("Return pointers to all xpath_nodes returned by \\XPATH.NODE_SET.")
-	.Documentation(R"()")
+	.Category(CATEGORY)
+	.FunctionHelp("Return pointers to all xpath_nodes in an XPath node set.")
+	.Documentation(R"(
+)")
 );
 LPOPER WINAPI xll_xpath_node_set_nodes(HANDLEX nodes)
 {
@@ -323,7 +362,7 @@ LPOPER WINAPI xll_xpath_node_set_nodes(HANDLEX nodes)
 
 		o = OPER{};
 		for (const xpath_node& node : *nodes_) {
-			o.push_back(OPER(to_handle<const xpath_node>(&node)));
+			o.push_back(OPER(from_node(node.node())));
 		}
 	}
 	catch (const std::exception& ex) {
@@ -332,48 +371,32 @@ LPOPER WINAPI xll_xpath_node_set_nodes(HANDLEX nodes)
 
 	return &o;
 }
-
-/*
-doc = \XML.DOCUMENT(data)
-set = \XPATH.NODE_SET(doc, query)
-nodes = XPATH.NODE_SET.NODES(set) {xpath_node,...}
-xml = XML.XPATH_NODE.NODE(node)
-xml = XML.XPATH_NODE.NODE(nodes, i)
-*/
-
 AddIn xai_xpath_node_node(
-	Function(XLL_HANDLEX, "xll_xpath_node_node", "XML.XPATH_NODE.NODE")
+	Function(XLL_HANDLEX, "xll_xpath_node_node", "XPATH_NODE.NODE")
 	.Arguments({
-		Arg(XLL_HANDLEX, "nodes", "is node or a handle returned by \\XPATH.NODE_SET.NODES."),
-		Arg(XLL_WORD, "_index", "is a 1-based optional index."),
+		Arg(XLL_HANDLEX, "node", "is a handle returned by \\XPATH.NODE_SET.XPATH_NODES"),
 		})
-	.Category("XML")
-	.FunctionHelp("Return a pointer to an xml_node.")
-	.Documentation(R"()")
+		.Category(CATEGORY)
+	.FunctionHelp("Return node of XPath node.")
+	.Documentation(R"(
+)")
 );
-HANDLEX WINAPI xll_xpath_node_set_node(HANDLEX nodes, WORD i)
+HANDLEX WINAPI xll_xpath_node_node(HANDLEX node)
 {
 #pragma XLLEXPORT
-	HANDLEX node = INVALID_HANDLEX;
+	HANDLEX h = INVALID_HANDLEX;
 
 	try {
-		const xpath_node* pnode;
-		if (i == 0) {
-			pnode = to_pointer<const xpath_node>(nodes);
-			node = nodes;
-		}
-		else {
-			handle<xpath_node_set> nodes_(nodes);
-			ensure(nodes_);
-			ensure(i <= nodes_->size());
-			node = 0; // to_handle<const xml_node>(&(*nodes_)[i - 1].node());
+		handle<xpath_node> node_(node);
+		if (node_) {
+			h = from_node(node_->node());
 		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
 	}
 
-	return node;
+	return h;
 }
 
 #if 0
