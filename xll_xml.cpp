@@ -130,36 +130,37 @@ LPOPER WINAPI xll_xpath_node_set_nodes(HANDLEX nodes)
 /*
 doc = \XML.DOCUMENT(data)
 set = \XPATH.NODE_SET(doc, query)
-nodes = XPATH.NODE_SET.NODES(set)
-xml = XPATH_NODE.NODE(node)
-xml = XPATH_NODE.NODE(nodes, i)
+nodes = XPATH.NODE_SET.NODES(set) {xpath_node,...}
+xml = XML.XPATH_NODE.NODE(node)
+xml = XML.XPATH_NODE.NODE(nodes, i)
 */
 
 AddIn xai_xpath_node_node(
-	Function(XLL_HANDLEX, "xll_xpath_node_node", "XPATH_NODE.NODE")
+	Function(XLL_HANDLEX, "xll_xpath_node_node", "XML.XPATH_NODE.NODE")
 	.Arguments({
-		Arg(XLL_HANDLEX, "node", "is node or a handle returned by \\XPATH.NODE_SET.NODES."),
+		Arg(XLL_HANDLEX, "nodes", "is node or a handle returned by \\XPATH.NODE_SET.NODES."),
 		Arg(XLL_WORD, "_index", "is a 1-based optional index."),
 		})
-		.Category("XML")
+	.Category("XML")
 	.FunctionHelp("Return a pointer to an xml_node.")
 	.Documentation(R"()")
 );
-HANDLEX WINAPI xll_xpath_node_set_nodes(HANDLEX node, WORD i)
+HANDLEX WINAPI xll_xpath_node_set_node(HANDLEX nodes, WORD i)
 {
 #pragma XLLEXPORT
 	HANDLEX node = INVALID_HANDLEX;
 
 	try {
+		const xpath_node* pnode;
 		if (i == 0) {
-			const xml_node* pnode = to_pointer<const xml_node>(node);
-			node = to_handle<const xml_node>(pnode);
+			pnode = to_pointer<const xpath_node>(nodes);
+			node = nodes;
 		}
 		else {
-			handle<xpath_node_set> nodes_(node);
+			handle<xpath_node_set> nodes_(nodes);
 			ensure(nodes_);
 			ensure(i <= nodes_->size());
-			node = to_handle<const xml_node>(&(*nodes_)[i - 1].node());
+			node = 0; // to_handle<const xml_node>(&(*nodes_)[i - 1].node());
 		}
 	}
 	catch (const std::exception& ex) {
