@@ -37,6 +37,40 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str)
 	return h;
 }
 
+AddIn xai_xml_document_nodes(
+	Function(XLL_LPOPER, "xll_xml_document_nodes", "XML.DOCUMENT.NODES")
+	.Arguments({
+		Arg(XLL_HANDLEX, "doc", "is a handle returned by \\XLL.DOCUMENT."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return pointers to all nodes in a XML document.")
+	.Documentation(R"(
+)")
+);
+LPOPER WINAPI xll_xml_document_nodes(HANDLEX doc)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		handle<xml::document> doc_(doc);
+		ensure(doc_);
+		
+		xmlNodePtr root = xmlDocGetRootElement(*doc_);
+		o = OPER{};
+		for (xmlNodePtr node = root; node; node = node->next) {
+			o.push_back(OPER(to_handle<xmlNode>(node)));
+		}
+		
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+
 #if 0
 
 #ifdef _DEBUG

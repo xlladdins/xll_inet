@@ -20,6 +20,15 @@ namespace xml {
 		{ 
 			xmlFreeDoc(pdoc);
 		}
+
+		operator xmlDoc*()
+		{
+			return pdoc;
+		}
+		operator const xmlDoc*() const
+		{
+			return pdoc;
+		}
 	};
 
 } // namespace xml
