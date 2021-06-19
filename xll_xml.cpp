@@ -1,36 +1,11 @@
 // xll_xml.cpp - pugixml wrapper
-#include "pugixml-1.11/src/pugixml.hpp"
+#include "libxml2.h"
 #include "xll/xll/xll.h"
 
 #define CATEGORY "XML"
 
-using namespace pugi;
+using namespace xml;
 using namespace xll;
-
-#define XML_NODE_TYPE(X) \
-		X(null,			"Empty (null) node handle") \
-		X(document,		"A document tree's absolute root") \
-		X(element,		"Element tag, i.e. '<node/>'") \
-		X(pcdata,		"Plain character data, i.e. 'text'") \
-		X(cdata,		"Character data, i.e. '<![CDATA[text]]>'") \
-		X(comment,		"Comment tag, i.e. '<!-- text -->'") \
-		X(pi,			"Processing instruction, i.e. '<?name?>'") \
-		X(declaration,	"Document declaration, i.e. '<?xml version=\"1.0\"?>'") \
-		X(doctype,		"Document type declaration, i.e. '<!DOCTYPE doc>'") \
-
-#define XML_NODE_ENUM(a, b) XLL_CONST(WORD, XML_NODE_ ## a, xml_node_type::node_##a, b, CATEGORY, "")
-XML_NODE_TYPE(XML_NODE_ENUM)
-#undef XML_NODE_ENUM
-
-// use internal object pointer to node struct
-inline xml_node to_node(HANDLEX h)
-{
-	return xml_node(to_pointer<xml_node_struct>(h));
-}
-inline HANDLEX from_node(const xml_node& node)
-{
-	return to_handle<xml_node_struct>(node.internal_object());
-}
 
 AddIn xai_xml_document(
 	Function(XLL_HANDLEX, "xll_xml_document", "\\XML.DOCUMENT")
@@ -51,15 +26,7 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str)
 
 	try {
 		handle<view<char>> str_(str);
-		handle<xml_document> h_(new xml_document{});
-		// Makes a copy of buf. Consider using load_buffer_inplace.
-		xml_parse_result result = h_->load_buffer(str_->buf, str_->len);
-		if (!result) {
-			std::string err = "\\XML.DOCUMENT: parse error at: \"";
-			err += std::string(str_->buf + result.offset, 32);
-			err += "...\"";
-			XLL_WARNING(err.c_str());
-		}
+		handle<xml::document> h_(new xml::document(str_->buf, str_->len));
 
 		h = h_.get();
 	}
@@ -69,6 +36,8 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str)
 
 	return h;
 }
+
+#if 0
 
 #ifdef _DEBUG
 
@@ -399,7 +368,6 @@ HANDLEX WINAPI xll_xpath_node_node(HANDLEX node)
 	return h;
 }
 
-#if 0
 #ifdef _DEBUG
 
 int test_xml()

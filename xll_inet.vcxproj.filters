@@ -24,6 +24,9 @@
     <ClInclude Include="xll_csv.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="libxml2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp">
@@ -36,9 +39,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="xll_xml.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pugixml-1.11\src\pugixml.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
