@@ -19,6 +19,7 @@ namespace xml {
 		~document()
 		{ 
 			xmlFreeDoc(pdoc);
+			xmlCleanupParser();
 		}
 
 		operator xmlDoc*()

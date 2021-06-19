@@ -70,6 +70,124 @@ LPOPER WINAPI xll_xml_document_nodes(HANDLEX doc)
 	return &o;
 }
 
+AddIn xai_xml_node_name(
+	Function(XLL_LPOPER, "xll_xml_node_name", "XML.NODE.NAME")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a pointer to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return name of a node.")
+	.Documentation(R"(
+Name of the node.
+)")
+);
+LPOPER WINAPI xll_xml_node_name(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = ErrNA;
+		o = (char*)to_pointer<xmlNode>(node)->name;
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_path(
+	Function(XLL_LPOPER, "xll_xml_node_path", "XML.NODE.PATH")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return path of a node.")
+	.Documentation(R"(
+Full path to node in XML document.
+)")
+);
+LPOPER WINAPI xll_xml_node_path(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = ErrNA;
+		o = (char*)xmlGetNodePath(to_pointer<xmlNode>(node));
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_children(
+	Function(XLL_LPOPER, "xll_xml_node_children", "XML.NODE.CHILDREN")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return children of a node.")
+	.Documentation(R"(
+Pointers to children nodes.
+)")
+);
+LPOPER WINAPI xll_xml_node_children(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		xmlNode* pnode = to_pointer<xmlNode>(node);
+
+		o = OPER{};
+		for (xmlNodePtr child = pnode->children; child; child = child->next) {
+			o.push_back(OPER(to_handle<xmlNode>(child)));
+		}
+
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_type(
+	Function(XLL_LPOPER, "xll_xml_node_type", "XML.NODE.TYPE")
+	.Arguments({
+		Arg(XLL_HANDLEX, "element", "is a ponter to an XML element."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Get element type.")
+);
+LPOPER WINAPI xll_xml_node_type(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER ElementType[] = {
+		OPER("UNKNOWN"),
+		OPER("ELEMENT"),
+		OPER("ATTRIBUTE"),
+		OPER("TEXT"),
+		OPER("CDATA_SECTION"),
+		OPER("ENTITY_REF"),
+		OPER("ENTITY"),
+		OPER("PI"),
+		OPER("COMMENT"),
+		OPER("DOCUMENT"),
+		OPER("DOCUMENT_TYPE"),
+		OPER("DOCUMENT_FRAG"),
+		OPER("NOTATION"),
+		OPER("HTML_DOCUMENT"),
+	};
+	xmlNode* pnode = to_pointer<xmlNode>(node);
+	xmlElementType type = pnode->type;
+
+	return &ElementType[type];
+}
 
 #if 0
 
