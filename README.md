@@ -6,39 +6,34 @@ wants be when it grows up.
 
 A limitation of `WEBSERVICE` is that it returns a string. Strings in Excel are
 limited to 32767 = 2<sup>15</sup> - 1 characters. Most web pages are larger
-than that. Much larger. The function `\INET.READ.VIEW(url)` returns a handle 
+than that. Much larger. The function `\INET.READ(url)` returns a handle 
 to all the characters returned from the URL. It uses 
 [`InternetOpenUrl](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
 , [`InternetReadFile`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile)
 , and memory mapped files to buffer data to memory.
-The returned handle is a view of the characters and can be used to 
-access (`VIEW.STR(view, offset, count)`) this data.
+The returned handle is a view of the characters. 
+Use `INET.STR(view, offset, count)` to access this data.
 
-## Usage
+## XML
 
-```
-view = \INET.READ.VIEW(url)
-str = VIEW.STR(view, offset, length)
-doc = XML.DOCUMENT(view) // load and parse
-type = XML.NODE.TYPE(node) // document, element, pc_data, ...
-name = XML.NODE.NAME(node)
-attr = XML.NODE.ATTRIBUTES(node)
-children = XML.NODE.CHILDREN(node)
-```
+This library uses [libxml2](http://xmlsoft.org/downloads.html) for XML/HTML parsing and XPath.
+To build you should install `libxml2` using [vcpkg](https://vcpkg.io/en/).
+This is what [`FILTERXML`](https://support.microsoft.com/en-us/office/filterxml-function-4df72efc-11ec-4951-86f5-c1374812f5b7)
+wants to be when it grows up.
+
+`\XML.DOCUMENT` parses the data returned by `\INET.READ`. Use `XML.DOCUMENT.ROOT`
+to get the XML root node. Given any XML node, `XML.NODE.NODES(node)` returns pointers
+`node` and all following nodes, if any. Use `XML.NODE.CHILDREN(node)` to get pointers
+to all children of `node`. There are `XML.NODE.*` functions for the node type, name,
+full document path, and content.
 
 ## XPath
 
-An XML _document_ is the _root_ of a directed acyclic tree of _node_s. 
-Each node has _siblings_ and zero or more _children_. 
-Siblings have the same _parent_ node and are the children of that parent. 
-A node can be an _element_, _pcdata_, _cdata_, _comment_, _pi_, or _declaration_.
-
-Element nodes have a _name_, _attributes_ and child nodes.
-Each attribute has a _name_ and _value_.
-
-```
-node := document | element | pcdata | cdata | comment | pi | declaration
-```
+`\XPATH.QUERY(doc, query)` executes a XPath query on a document.
+Use `XPATH.QUERY.NODES` to get pointers to all nodes returned by the query, if any.
+A simple way to get a full picture of the result of a URL query is to
+call `doc = \INET.READ(url)`, `doc = \XML.DOCUMENT(doc)`, `query = XPATH.QUERY(doc, "\\*")`,
+then call `XML.NODE.*` functions to get types, names, paths, and content.
 
 ## Remarks
 
