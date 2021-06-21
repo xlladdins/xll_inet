@@ -7,6 +7,20 @@
 using namespace xml;
 using namespace xll;
 
+extern "C" void xmlErrorHandler(void*, xmlErrorPtr error)
+{
+	switch (error->level) {
+	case XML_ERR_WARNING:
+		XLL_WARNING(error->message);
+		break;
+	case XML_ERR_ERROR:
+	case XML_ERR_FATAL:
+		XLL_ERROR(error->message);
+	default:
+		XLL_ERROR(__FUNCTION__ ": unknown error");
+	}
+}
+
 AddIn xai_xml_document(
 	Function(XLL_HANDLEX, "xll_xml_document", "\\XML.DOCUMENT")
 	.Arguments({
@@ -37,31 +51,93 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str)
 	return h;
 }
 
-AddIn xai_xml_document_nodes(
-	Function(XLL_LPOPER, "xll_xml_document_nodes", "XML.DOCUMENT.NODES")
+AddIn xai_xml_document_root(
+	Function(XLL_LPOPER, "xll_xml_document_root", "XML.DOCUMENT.ROOT")
 	.Arguments({
 		Arg(XLL_HANDLEX, "doc", "is a handle returned by \\XLL.DOCUMENT."),
 		})
 		.Category(CATEGORY)
-	.FunctionHelp("Return pointers to all nodes in a XML document.")
+	.FunctionHelp("Return pointers to the root node of a XML document.")
 	.Documentation(R"(
 )")
 );
-LPOPER WINAPI xll_xml_document_nodes(HANDLEX doc)
+LPOPER WINAPI xll_xml_document_root(HANDLEX doc)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
 	try {
+		o = ErrNA;
 		handle<xml::document> doc_(doc);
 		ensure(doc_);
 		
 		xmlNodePtr root = xmlDocGetRootElement(*doc_);
-		o = OPER{};
-		for (xmlNodePtr node = root; node; node = node->next) {
-			o.push_back(OPER(to_handle<xmlNode>(node)));
+		if (root) {
+			o = OPER(to_handle<xmlNode>(root));
 		}
-		
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_children(
+	Function(XLL_LPOPER, "xll_xml_node_children", "XML.NODE.CHILDREN")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return children of a node.")
+	.Documentation(R"(
+Array of pointers to all children nodes.
+)")
+);
+LPOPER WINAPI xll_xml_node_children(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		xmlNode* pnode = to_pointer<xmlNode>(node);
+
+		o = OPER{};
+		for (xmlNodePtr child = xmlFirstElementChild(pnode); child; child = xmlNextElementSibling(child)) {
+			o.push_back(OPER(to_handle<xmlNode>(child)));
+		}
+
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_content(
+	Function(XLL_LPOPER, "xll_xml_node_content", "XML.NODE.CONTENT")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a pointer to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return content of a node.")
+	.Documentation(R"(
+Content of the node or <code>#N/A</code> if none.
+)")
+);
+LPOPER WINAPI xll_xml_node_content(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = ErrNA;
+		xmlChar* content = xmlNodeGetContent(to_pointer<xmlNode>(node));
+		if (content) {
+			o = (char*)content;
+			xmlFree(content);
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -97,6 +173,36 @@ LPOPER WINAPI xll_xml_node_name(HANDLEX node)
 	return &o;
 }
 
+AddIn xai_xml_node_next(
+	Function(XLL_LPOPER, "xll_xml_node_next", "XML.NODE.NEXT")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return next node of a XML node.")
+	.Documentation(R"(
+Next node in XML document.
+)")
+);
+LPOPER WINAPI xll_xml_node_next(HANDLEX node)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = ErrNA;
+		xmlNode* pnode = to_pointer<xmlNode>(node);
+		if (pnode) {
+			o = to_handle<xmlNode>(pnode->next);
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
 AddIn xai_xml_node_path(
 	Function(XLL_LPOPER, "xll_xml_node_path", "XML.NODE.PATH")
 	.Arguments({
@@ -124,37 +230,6 @@ LPOPER WINAPI xll_xml_node_path(HANDLEX node)
 	return &o;
 }
 
-AddIn xai_xml_node_children(
-	Function(XLL_LPOPER, "xll_xml_node_children", "XML.NODE.CHILDREN")
-	.Arguments({
-		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
-		})
-		.Category(CATEGORY)
-	.FunctionHelp("Return children of a node.")
-	.Documentation(R"(
-Pointers to children nodes.
-)")
-);
-LPOPER WINAPI xll_xml_node_children(HANDLEX node)
-{
-#pragma XLLEXPORT
-	static OPER o;
-
-	try {
-		xmlNode* pnode = to_pointer<xmlNode>(node);
-
-		o = OPER{};
-		for (xmlNodePtr child = pnode->children; child; child = child->next) {
-			o.push_back(OPER(to_handle<xmlNode>(child)));
-		}
-
-	}
-	catch (const std::exception& ex) {
-		XLL_ERROR(ex.what());
-	}
-
-	return &o;
-}
 
 AddIn xai_xml_node_type(
 	Function(XLL_LPOPER, "xll_xml_node_type", "XML.NODE.TYPE")
@@ -182,12 +257,33 @@ LPOPER WINAPI xll_xml_node_type(HANDLEX node)
 		OPER("DOCUMENT_FRAG"),
 		OPER("NOTATION"),
 		OPER("HTML_DOCUMENT"),
+		OPER("DTD"),
+		OPER("ELEMENT_DECL"),
+		OPER("ATTRIBUTE_DECL"),
+		OPER("ENTITY_DECL"),
+		OPER("NAMESPACE_DECL"),
+		OPER("XINCLUDE_START"),
+		OPER("XINCLUDE_END"),
 	};
 	xmlNode* pnode = to_pointer<xmlNode>(node);
-	xmlElementType type = pnode->type;
+	xmlElementType type = pnode ? pnode->type : static_cast<xmlElementType>(0);
 
 	return &ElementType[type];
 }
+
+/*
+XML.NODE.ATTRIBUTE.TYPE
+	XML_ATTRIBUTE_CDATA = 1,
+	XML_ATTRIBUTE_ID,
+	XML_ATTRIBUTE_IDREF	,
+	XML_ATTRIBUTE_IDREFS,
+	XML_ATTRIBUTE_ENTITY,
+	XML_ATTRIBUTE_ENTITIES,
+	XML_ATTRIBUTE_NMTOKEN,
+	XML_ATTRIBUTE_NMTOKENS,
+	XML_ATTRIBUTE_ENUMERATION,
+	XML_ATTRIBUTE_NOTATION
+*/
 
 #if 0
 
