@@ -8,7 +8,7 @@ A limitation of `WEBSERVICE` is that it returns a string. Strings in Excel are
 limited to 32767 = 2<sup>15</sup> - 1 characters. Most web pages are larger
 than that. Much larger. The function `\INET.READ(url)` returns a handle 
 to all the characters returned from the URL. It uses 
-[`InternetOpenUrl](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
+[`InternetOpenUrl`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
 , [`InternetReadFile`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile)
 , and memory mapped files to buffer data to memory.
 The returned handle is a view of the characters. 
@@ -22,8 +22,8 @@ This is what [`FILTERXML`](https://support.microsoft.com/en-us/office/filterxml-
 wants to be when it grows up.
 
 `\XML.DOCUMENT` parses the data returned by `\INET.READ`. Use `XML.DOCUMENT.ROOT`
-to get the XML root node. Given any XML node, `XML.NODE.NODES(node)` returns pointers
-`node` and all following nodes, if any. Use `XML.NODE.CHILDREN(node)` to get pointers
+to get the XML root node. Given any XML node, `XML.NODE.NODES(node)` returns a pointer
+to  `node` and all following nodes, if any. Use `XML.NODE.CHILDREN(node)` to get pointers
 to all children of `node`. There are `XML.NODE.*` functions for the node type, name,
 full document path, and content.
 
@@ -32,7 +32,7 @@ full document path, and content.
 `\XPATH.QUERY(doc, query)` executes a XPath query on a document.
 Use `XPATH.QUERY.NODES` to get pointers to all nodes returned by the query, if any.
 A simple way to get a full picture of the result of a URL query is to
-call `doc = \INET.READ(url)`, `doc = \XML.DOCUMENT(doc)`, `query = XPATH.QUERY(doc, "\\*")`,
+call `\INET.READ(url)`, `\XML.DOCUMENT(data)`, `XPATH.QUERY(doc, "//*")`,
 then call `XML.NODE.*` functions to get types, names, paths, and content.
 
 ## Remarks
