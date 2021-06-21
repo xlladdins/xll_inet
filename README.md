@@ -2,7 +2,7 @@
 
 [WinInet](https://docs.microsoft.com/en-us/windows/win32/wininet/portal) for Excel, or what
 [`WEBSERVICE`](https://support.microsoft.com/en-us/office/webservice-function-0546a35a-ecc6-4739-aed7-c0b7ce1562c4)
-wants to grow up to be.
+wants be when it grows up.
 
 A limitation of `WEBSERVICE` is that it returns a string. Strings in Excel are
 limited to 32767 = 2<sup>15</sup> - 1 characters. Most web pages are larger

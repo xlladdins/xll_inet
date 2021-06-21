@@ -1,4 +1,5 @@
 // xll_xml.cpp - pugixml wrapper
+#include <sstream>
 #include "libxml2.h"
 #include "xll/xll/xll.h"
 
@@ -7,40 +8,105 @@
 using namespace xml;
 using namespace xll;
 
-extern "C" void xmlErrorHandler(void*, xmlErrorPtr error)
+extern "C" void xmlErrorHandler(void* xml_error, xmlErrorPtr error)
 {
+	*(xmlErrorPtr)xml_error = *error;
+	std::ostringstream err(__FUNCTION__ ": ");
+	err << error->message << "\n";
+	err << "file: " << error->file << "\n";
+	err << "line: " << error->line << "\n";
+	if (error->str1) {
+		err << "info: " << error->str1 << "\n";
+		if (error->str2) {
+			err << "info: " << error->str2 << "\n";
+			if (error->str3) {
+				err << "info: " << error->str3 << "\n";
+			}
+		}
+	}
+
 	switch (error->level) {
 	case XML_ERR_WARNING:
-		XLL_WARNING(error->message);
+		XLL_WARNING(err.str().c_str());
 		break;
 	case XML_ERR_ERROR:
 	case XML_ERR_FATAL:
-		XLL_ERROR(error->message);
+		XLL_ERROR(err.str().c_str());
+		break;
 	default:
 		XLL_ERROR(__FUNCTION__ ": unknown error");
 	}
 }
 
+inline xmlNodePtr node_pointer(HANDLEX node)
+{
+	return to_pointer<xmlNode>(node);
+}
+
+inline HANDLEX node_handle(xmlNodePtr node)
+{
+	return to_handle<xmlNode>(node);
+}
+
+#define XML_PARSE_TOPIC "http://xmlsoft.org/html/libxml-parser.html"
+#define XML_PARSE_ENUM(X) \
+	X(XML_PARSE_RECOVER, "recover on errors") \
+	X(XML_PARSE_NOENT, "substitute entities") \
+	X(XML_PARSE_DTDLOAD, "load the external subset") \
+	X(XML_PARSE_DTDATTR, "default DTD attributes") \
+	X(XML_PARSE_DTDVALID, "validate with the DTD") \
+	X(XML_PARSE_NOERROR, "suppress error reports") \
+	X(XML_PARSE_NOWARNING, "suppress warning reports") \
+	X(XML_PARSE_PEDANTIC, "pedantic error reporting") \
+	X(XML_PARSE_NOBLANKS, "remove blank nodes") \
+	X(XML_PARSE_SAX1, "use the SAX1 interface internally") \
+	X(XML_PARSE_XINCLUDE, "Implement XInclude substitution ") \
+	X(XML_PARSE_NONET, "Forbid network access") \
+	X(XML_PARSE_NODICT, "Do not reuse the context dictionary") \
+	X(XML_PARSE_NSCLEAN, "remove redundant namespaces declarations") \
+	X(XML_PARSE_NOCDATA, "merge CDATA as text nodes") \
+	X(XML_PARSE_NOXINCNODE, "do not generate XINCLUDE STARTnodes") \
+	X(XML_PARSE_COMPACT, "compact small text no") \
+	X(XML_PARSE_OLD10, "parse using XML-1.0 before update 5") \
+	X(XML_PARSE_NOBASEFIX, "do not fixup XINCLUDE xml:base uris") \
+	X(XML_PARSE_HUGE, "relax any hardcoded limit from the parser") \
+	X(XML_PARSE_OLDSAX, "parse using SAX2 interface before 2.7.0") \
+	X(XML_PARSE_IGNORE_ENC, "ignore internal document encoding hint") \
+	X(XML_PARSE_BIG_LINES, "Store big lines numbers in text PSVI field") \
+
+#define XML_PARSE_DATA(a, b) XLL_CONST(LONG, a, (LONG)a, b, CATEGORY, XML_PARSE_TOPIC);
+
+XML_PARSE_ENUM(XML_PARSE_DATA)
+
+#undef XML_PARSE_TOPIC
+#undef XML_PARSE_DATA
+
 AddIn xai_xml_document(
 	Function(XLL_HANDLEX, "xll_xml_document", "\\XML.DOCUMENT")
 	.Arguments({
 		Arg(XLL_HANDLEX, "data", "is a handle to a string"),
+		Arg(XLL_CSTRING4, "_url", "is an optional URL."),
+		Arg(XLL_CSTRING4, "_encoding", "is an optional encoding."),
+		Arg(XLL_SHORT, "_options", "are optional options."),
 		})
 	.Uncalced()
 	.Category(CATEGORY)
-	.FunctionHelp("Return a handle to the root node of a XML document.")
+	.FunctionHelp("Return handle to a XML document.")
 	.Documentation(R"(
-Load and parse data for a XML document.
+Load and parse <code>data</code> for a XML document.
 )")
 );
-HANDLEX WINAPI xll_xml_document(HANDLEX str)
+HANDLEX WINAPI xll_xml_document(HANDLEX str, const char* url, const char* encoding, SHORT options)
 {
 #pragma XLLEXPORT
 	HANDLEX h = INVALID_HANDLEX;
 
 	try {
 		handle<view<char>> str_(str);
-		handle<xml::document> h_(new xml::document(str_->buf, str_->len));
+		//options |= XML_PARSE_HUGE;
+		if (!*url) url = nullptr;
+		if (!*encoding) encoding = nullptr;
+		handle<xml::document> h_(new xml::document(str_->buf, str_->len, url, encoding, options));
 
 		h = h_.get();
 	}
@@ -73,7 +139,7 @@ LPOPER WINAPI xll_xml_document_root(HANDLEX doc)
 		
 		xmlNodePtr root = xmlDocGetRootElement(*doc_);
 		if (root) {
-			o = OPER(to_handle<xmlNode>(root));
+			o = OPER(node_handle(root));
 		}
 	}
 	catch (const std::exception& ex) {
@@ -100,13 +166,12 @@ LPOPER WINAPI xll_xml_node_children(HANDLEX node)
 	static OPER o;
 
 	try {
-		xmlNode* pnode = to_pointer<xmlNode>(node);
+		xmlNode* pnode = node_pointer(node);
 
 		o = OPER{};
-		for (xmlNodePtr child = xmlFirstElementChild(pnode); child; child = xmlNextElementSibling(child)) {
-			o.push_back(OPER(to_handle<xmlNode>(child)));
+		for (const auto child : node::children(pnode)) {
+			o.push_back(OPER(node_handle(child)));
 		}
-
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -133,10 +198,8 @@ LPOPER WINAPI xll_xml_node_content(HANDLEX node)
 
 	try {
 		o = ErrNA;
-		xmlChar* content = xmlNodeGetContent(to_pointer<xmlNode>(node));
-		if (content) {
-			o = (char*)content;
-			xmlFree(content);
+		if (node) {
+			o = node::content(node_pointer(node));
 		}
 	}
 	catch (const std::exception& ex) {
@@ -164,7 +227,7 @@ LPOPER WINAPI xll_xml_node_name(HANDLEX node)
 
 	try {
 		o = ErrNA;
-		o = (char*)to_pointer<xmlNode>(node)->name;
+		o = (char*)node_pointer(node)->name;
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -174,14 +237,14 @@ LPOPER WINAPI xll_xml_node_name(HANDLEX node)
 }
 
 AddIn xai_xml_node_next(
-	Function(XLL_LPOPER, "xll_xml_node_next", "XML.NODE.NEXT")
+	Function(XLL_LPOPER, "xll_xml_node_next", "XML.NODE.NODES")
 	.Arguments({
 		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
 		})
 		.Category(CATEGORY)
-	.FunctionHelp("Return next node of a XML node.")
+	.FunctionHelp("Return next nodes of a XML node.")
 	.Documentation(R"(
-Next node in XML document.
+All nodes following <code>node</code>.
 )")
 );
 LPOPER WINAPI xll_xml_node_next(HANDLEX node)
@@ -190,10 +253,14 @@ LPOPER WINAPI xll_xml_node_next(HANDLEX node)
 	static OPER o;
 
 	try {
-		o = ErrNA;
-		xmlNode* pnode = to_pointer<xmlNode>(node);
+		xmlNode* pnode = node_pointer(node);
 		if (pnode) {
-			o = to_handle<xmlNode>(pnode->next);
+			for (const auto nodes : node::iterator(pnode)) {
+				o.push_back(OPER(node_handle(nodes)));
+			}
+		}
+		else {
+			o = ErrNA;
 		}
 	}
 	catch (const std::exception& ex) {
@@ -221,7 +288,7 @@ LPOPER WINAPI xll_xml_node_path(HANDLEX node)
 
 	try {
 		o = ErrNA;
-		o = (char*)xmlGetNodePath(to_pointer<xmlNode>(node));
+		o = (char*)xmlGetNodePath(node_pointer(node));
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -265,10 +332,70 @@ LPOPER WINAPI xll_xml_node_type(HANDLEX node)
 		OPER("XINCLUDE_START"),
 		OPER("XINCLUDE_END"),
 	};
-	xmlNode* pnode = to_pointer<xmlNode>(node);
+	xmlNode* pnode = node_pointer(node);
 	xmlElementType type = pnode ? pnode->type : static_cast<xmlElementType>(0);
 
 	return &ElementType[type];
+}
+
+AddIn xai_xpath_query(
+	Function(XLL_HANDLEX, "xll_xpath_query", "\\XPATH.QUERY")
+	.Arguments({
+		Arg(XLL_HANDLEX, "doc", "is a handle to a XML document."),
+		Arg(XLL_CSTRING4, "query", "is a XPath query."),
+		})
+	.Uncalced()
+	.FunctionHelp("Return handle to a XPath query")
+	.Category(CATEGORY)
+	.Documentation(R"()")
+);
+HANDLEX WINAPI xll_xpath_query(HANDLEX doc, const char* query)
+{
+#pragma XLLEXPORT
+	HANDLEX h = INVALID_HANDLEX;
+
+	try {
+		handle<xml::document> doc_(doc);
+		ensure(doc_);
+		handle<xpath::query> query_(new xpath::query(*doc_, query));
+
+		h = query_.get();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return h;
+}
+
+AddIn xai_xpath_query_nodes(
+	Function(XLL_LPOPER, "xll_xpath_query_nodes", "XPATH.QUERY.NODES")
+	.Arguments({
+		Arg(XLL_HANDLEX, "query", "is a handle returned by \\XPATH.QUERY."),
+		})
+	.FunctionHelp("Return all nodes matched by query.")
+	.Category(CATEGORY)
+	.Documentation(R"()")
+);
+LPOPER WINAPI xll_xpath_query_nodes(HANDLEX query)
+{
+#pragma XLLEXPORT
+	static OPER nodes;
+
+	try {
+		handle<xpath::query> query_(query);
+		ensure(query_);
+
+		nodes = OPER{};
+		for (const auto node : *query_) {
+			nodes.push_back(OPER(node_handle(node)));
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &nodes;
 }
 
 /*
