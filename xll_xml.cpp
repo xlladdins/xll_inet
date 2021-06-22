@@ -48,7 +48,6 @@ inline HANDLEX node_handle(xmlNodePtr node)
 	return to_handle<xmlNode>(node);
 }
 
-#define XML_PARSE_TOPIC "http://xmlsoft.org/html/libxml-parser.html"
 #define XML_PARSE_ENUM(X) \
 	X(XML_PARSE_RECOVER, "recover on errors") \
 	X(XML_PARSE_NOENT, "substitute entities") \
@@ -74,6 +73,7 @@ inline HANDLEX node_handle(xmlNodePtr node)
 	X(XML_PARSE_IGNORE_ENC, "ignore internal document encoding hint") \
 	X(XML_PARSE_BIG_LINES, "Store big lines numbers in text PSVI field") \
 
+#define XML_PARSE_TOPIC "http://xmlsoft.org/html/libxml-parser.html"
 #define XML_PARSE_DATA(a, b) XLL_CONST(LONG, a, (LONG)a, b, CATEGORY, XML_PARSE_TOPIC);
 
 XML_PARSE_ENUM(XML_PARSE_DATA)
@@ -87,7 +87,7 @@ AddIn xai_xml_document(
 		Arg(XLL_HANDLEX, "data", "is a handle to a string"),
 		Arg(XLL_CSTRING4, "_url", "is an optional URL."),
 		Arg(XLL_CSTRING4, "_encoding", "is an optional encoding."),
-		Arg(XLL_SHORT, "_options", "are optional options."),
+		Arg(XLL_SHORT, "_options", "are optional options from the XML_PARSE_* enumeration."),
 		})
 	.Uncalced()
 	.Category(CATEGORY)
@@ -125,6 +125,7 @@ AddIn xai_xml_document_root(
 		.Category(CATEGORY)
 	.FunctionHelp("Return pointers to the root node of a XML document.")
 	.Documentation(R"(
+Every well-formed XML document has a root node. This is it.
 )")
 );
 LPOPER WINAPI xll_xml_document_root(HANDLEX doc)
@@ -303,8 +304,13 @@ AddIn xai_xml_node_type(
 	.Arguments({
 		Arg(XLL_HANDLEX, "element", "is a ponter to an XML element."),
 		})
-		.Category(CATEGORY)
+	.Category(CATEGORY)
 	.FunctionHelp("Get element type.")
+	.Documentation(R"(
+Return the node type: element, attribute, text, CDATA, entity reference, entity
+processing instruction, comment, document, document type, document fragment,
+notation, HTML document, document type definition, ...
+)")
 );
 LPOPER WINAPI xll_xml_node_type(HANDLEX node)
 {
@@ -347,7 +353,9 @@ AddIn xai_xpath_query(
 	.Uncalced()
 	.FunctionHelp("Return handle to a XPath query")
 	.Category(CATEGORY)
-	.Documentation(R"()")
+	.Documentation(R"(
+Return a handle to all nodes matching <code>query</code>.
+)")
 );
 HANDLEX WINAPI xll_xpath_query(HANDLEX doc, const char* query)
 {
@@ -375,7 +383,9 @@ AddIn xai_xpath_query_nodes(
 		})
 	.FunctionHelp("Return all nodes matched by query.")
 	.Category(CATEGORY)
-	.Documentation(R"()")
+	.Documentation(R"(
+Return pointers to all nodes returned by <code>\XPATH.QUERY</code>
+)")
 );
 LPOPER WINAPI xll_xpath_query_nodes(HANDLEX query)
 {

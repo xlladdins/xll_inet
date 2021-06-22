@@ -58,6 +58,14 @@ inline OPER headers(const OPER& o)
     return h;
 }
 
+#ifdef _DEBUG
+Auto<OpenAfter> xaoa_inet_doc([]() {
+    return Documentation("INET", R"(
+Functions for retrieving and parsing URLs.
+)");
+});
+#endif // _DEBUG
+
 AddIn xai_inet_read_file(
     Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.READ")
     .Arguments({
