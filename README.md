@@ -10,9 +10,9 @@ than that. Much larger. The function `\INET.READ(url)` returns a handle
 to all the characters returned from the URL. It uses 
 [`InternetOpenUrl`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
 , [`InternetReadFile`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile)
-, and memory mapped files to buffer data to memory.
+, and a memory mapped file to buffer data to memory.
 The returned handle is a view of the characters. 
-Use `INET.STR(view, offset, count)` to access this data.
+Use `INET.VIEW(read, offset, count)` to access this data.
 
 ## XML
 
@@ -32,7 +32,7 @@ full document path, and content.
 `\XPATH.QUERY(doc, query)` executes a XPath query on a document.
 Use `XPATH.QUERY.NODES` to get pointers to all nodes returned by the query, if any.
 A simple way to get a full picture of the result of a URL query is to
-call `\INET.READ(url)`, `\XML.DOCUMENT(data)`, `XPATH.QUERY(doc, "//*")`,
+call `\INET.READ(url)`, `\XML.DOCUMENT(read)`, `XPATH.QUERY(doc, "//*")`,
 then call `XML.NODE.*` functions to get types, names, paths, and content.
 
 ## Remarks

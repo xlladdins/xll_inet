@@ -86,9 +86,11 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
         DWORD_PTR context = NULL;
         OPER head = headers(*pheaders);
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
+        ensure(hurl || !"\\INET.READ: failed to open URL")
  
         DWORD len = 4096; // ??? page size
-        char* buf = h_->buf;
+        *h_->buf = 0; // buffer index when split
+        char* buf = h_->buf + 1; // allow for count
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
             h_->len += len;
             buf += len;
@@ -104,7 +106,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 }
 
 AddIn xai_inet_file(
-    Function(XLL_LPOPER, "xll_inet_file", "INET.STR")
+    Function(XLL_LPOPER, "xll_inet_file", "INET.VIEW")
     .Arguments({
         Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.READ."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
@@ -125,10 +127,10 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
         handle<view<char>> h_(h);
 
         if (len == 0 or len > static_cast<LONG>(h_->len) - off) {
-            len = h_->len - off;
+            len = h_->len - off - 1;
         }
 
-        result = OPER(h_->buf + off, len);
+        result = OPER(h_->buf + off + 1, len);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
@@ -137,6 +139,97 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     }
 
     return &result;
+}
+
+// up to 254 instances of split buffers
+static unsigned int buf_index = 0;
+static XLOPER buf_split[255] = { ErrNA4 } ;
+static std::vector<XLOPER> buf_lparray[255];
+
+AddIn xai_inet_split(
+    Function(XLL_LPXLOPER4, "xll_inet_split", "INET.SPLIT")
+    .Arguments({
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.READ."),
+        })
+    .FunctionHelp("Return substring of split.")
+    .Category(CATEGORY)
+    .Documentation(R"xyzyx(
+Split lines returned by <code>\INET.READ</code> at new line characters.
+Note that this modifies the memory pointed to by handle. 
+Lines longer than 255 characters containing no spaces have their last character clobbered.
+)xyzyx")
+);
+LPXLOPER WINAPI xll_inet_split(HANDLEX h)
+{
+#pragma XLLEXPORT
+    unsigned int b0 = 0;
+
+    try {
+        handle<view<char>> h_(h);
+        ensure(h_ || !"INET.SPLIT: unrecognized handle");
+
+        char* b = h_->buf;
+
+        b0 = b[0]; // index if already split
+
+        if (b0 == 0) {
+            b0 = ++buf_index;
+            if (b0 >= 256) {
+                XLL_ERROR("INET.SPLIT: at most 254 buffers allowed");
+
+                return &buf_split[0];
+            }
+            buf_split[b0].xltype = xltypeMulti;
+            // skip UTF-8 BOM
+            if (b[1] == 0xEF) {
+                ++b;
+                ensure(b[1] == 0xBB || !"INET.SPLIT: data not UTF-8 encoded");
+                ++b;
+                ensure(b[1] == 0xBF || !"INET.SPLIT: data not UTF-8 encoded");
+                ++b;
+            }
+
+            *b = 1; // for now
+            while (*b) {
+                char* sp = 0;
+                unsigned int c = 1;
+                while (c <= 255 and b[c] != 0 and b[c] != '\n') {
+                    if (b[c] == ' ') {
+                        sp = b + c; // last space character
+                    }
+                    ++c;
+                }
+                if (c == 256) {
+                    *b = static_cast<unsigned char>(sp - b - 1);
+                    XLOPER row = { .val = {.str = b }, .xltype = xltypeStr };
+                    buf_lparray[b0].push_back(row);
+                    if (sp == 0) {
+                        XLL_WARNING("INET.SPLIT: clobbering one character in a long line");
+                        b += c;
+                    }
+                    else {
+                        b = sp;
+                    }
+                }
+                else {
+                    *b = static_cast<unsigned char>(c - 1);
+                    XLOPER row = { .val = {.str = b }, .xltype = xltypeStr };
+                    buf_lparray[b0].push_back(row);
+                    b += c;
+                }
+            }
+            buf_split[b0].val.array.rows = (WORD)buf_lparray[b0].size();
+            buf_split[b0].val.array.columns = 1;
+            buf_split[b0].val.array.lparray = buf_lparray[b0].data();
+        }
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        b0 = 0; // ErrNA
+    }
+
+    return &buf_split[b0];
 }
 
 #if 0
