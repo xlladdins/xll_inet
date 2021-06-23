@@ -38,3 +38,5 @@ then call `XML.NODE.*` functions to get types, names, paths, and content.
 ## Remarks
 
 http://worldtimeapi.org/pages/schema
+http://worldtimeapi.org/api/timezone/Europe/London.txt
+

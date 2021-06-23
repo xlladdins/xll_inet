@@ -107,8 +107,87 @@ namespace xll {
 
 #endif // _DEBUG
 
+	// "2021-06-22T21:30:48.323279+01:00"
+	// Convert ISO 8601 date string to Excel date
+	inline double ISO8601(xcstr s, int len = 0)
+	{
+		static auto date_year = [](xcstr s) {
+			return _istdigit(s[0]) && _istdigit(s[1]) && _istdigit(s[2]) && _istdigit(s[3]);
+		};
+		static auto date_month = [](xcstr s) {
+			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' <= 12;
+		};
+		static auto date_day = [](xcstr s) {
+			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' <= 31;
+		};
+		static auto date_hour = [](xcstr s) {
+			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' < 24;
+		};
+		static auto date_minute = [](xcstr s) {
+			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' < 60;
+		};
+		static auto date_second = [](xcstr s) {
+			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' < 61;
+		};
+		static constexpr double NaN = std::numeric_limits<double>::quiet_NaN();
+
+		if (len == 0) {
+			len = (int)_tcslen(s);
+		}
+
+		// Use built-in data parsing first.
+		OPER o = Excel(xlfValue, OPER(s, len));
+		if (o.is_num()) {
+			OPER o_ = Excel(xlfEvaluate, OPER(s, len));
+			if (o == o_) {
+				return NaN; // its a number, not a date
+			}
+			else {
+				return o.val.num;
+			}
+		}
+
+		if (date_year(s)) {
+			s += 4;
+			if (*s != '-') {
+				return NaN;
+			}
+			++s;
+			if (date_month(s)) {
+				s += 2;
+				if (*s != '-') {
+					return NaN;
+				}
+				if (date_day(s)) {
+					s += 2;
+					if (*s == '.') {
+						// secfrac
+						while (_istdigit(*++s)) {
+							;
+						}
+					}
+					if (*s != 'T') {
+						// yyyy-mm-dd would have already been converted
+						return NaN;
+					}
+					++s;
+					if (date_hour(s)) {
+						if (*s != ':') {
+							return NaN;
+						}
+					}
+				}
+			}
+		}
+
+		return NaN;
+	}
+
+#ifdef _DEBUG
+#endif // _DEBUG
+
 	// null or rs. return nullptr if not eol
-	inline xcstr csv_eol(xcstr s, xcstr rs = _T("\r\n"))
+	inline xcstr csv_eol(xcstr s, xcstr rs = _T("\n"))
 	{
 		if (*s == 0) {
 			return s;
@@ -153,9 +232,9 @@ namespace xll {
 	inline int xll_test_csv_skip() {
 
 		try {
-			ensure(0 == *csv_eol(_T("\r\n")));
-			ensure(_T('a') == *csv_eol(_T("\r\nabc")));
-			ensure(0 == csv_eol(_T("abc\r\n")));
+			ensure(0 == *csv_eol(_T("\n")));
+			ensure(_T('a') == *csv_eol(_T("\nabc")));
+			ensure(0 == csv_eol(_T("abc\n")));
 
 			LPCTSTR s;
 			s = csv_skip(_T(""), _T('{'), _T('}'), _T('\\'));
@@ -183,8 +262,8 @@ namespace xll {
 #endif // _DEBUG
 
 	// view of next record and advance row pointer
-	inline auto csv_row_item(xcstr& csv,
-		xchar fs = _T(','), xcstr rs = _T("\r\n"), xchar esc = _T('\"'))
+	inline auto csv_parse_row_item(xcstr& csv,
+		xchar fs = _T(','), xcstr rs = _T("\n"), xchar esc = _T('\"'))
 	{
 		if (csv_eol(csv, rs)) {
 			return item(csv, 0);
@@ -205,7 +284,7 @@ namespace xll {
 		return trim(i, _T(" "));
 	}
 
-	inline OPER csv_field_parse(item<const xchar> field)
+	inline OPER csv_parse_field(item<const xchar> field)
 	{
 		static OPER t("TRUE"), f("FALSE");
 
@@ -235,14 +314,14 @@ namespace xll {
 	}
 
 #ifdef _DEBUG
-	int xll_test_csv_field_parse()
+	int xll_test_csv_parse_field()
 	{
 		try {
-			ensure(csv_field_parse(item(_T("abc"))) == OPER("abc"));
-			ensure(csv_field_parse(item(_T(" abc "))) == OPER("abc"));
-			ensure(csv_field_parse(item(_T("1.23"))) == OPER(1.23));
-			ensure(csv_field_parse(item(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
-			ensure(csv_field_parse(item(_T("tRue"))) == OPER(true));
+			ensure(csv_parse_field(item(_T("abc"))) == OPER("abc"));
+			ensure(csv_parse_field(item(_T(" abc "))) == OPER("abc"));
+			ensure(csv_parse_field(item(_T("1.23"))) == OPER(1.23));
+			ensure(csv_parse_field(item(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
+			ensure(csv_parse_field(item(_T("tRue"))) == OPER(true));
 		}
 		catch (const std::exception& ex) {
 			XLL_ERROR(ex.what());
@@ -254,24 +333,24 @@ namespace xll {
 	}
 #endif // _DEBUG
 
-	inline OPER csv_row_parse(xcstr& csv, xchar fs = _T(','), xcstr rs = _T("\r\n"), xchar esc = _T('"'))
+	inline OPER csv_parse_row(xcstr& csv, xchar fs = _T(','), xcstr rs = _T("\n"), xchar esc = _T('"'))
 	{
 		OPER row;
 
-		while (auto item = csv_row_item(csv, fs, rs, esc)) {
-			row.push_back(csv_field_parse(item));
+		while (auto item = csv_parse_row_item(csv, fs, rs, esc)) {
+			row.push_back(csv_parse_field(item));
 		}
 		csv = csv_eol(csv, rs);
 		
 		return row.resize(1, row.size());
 	}
 
-	inline OPER csv_parse(xcstr& csv, xchar fs = _T(','), xcstr rs = _T("\r\n"), xchar esc = _T('"'))
+	inline OPER csv_parse(xcstr& csv, xchar fs = _T(','), xcstr rs = _T("\n"), xchar esc = _T('"'))
 	{
 		OPER table;
 
 		while (csv and *csv) {
-			OPER row = csv_row_parse(csv, fs, rs, esc);
+			OPER row = csv_parse_row(csv, fs, rs, esc);
 			if (table.columns() > 0) {
 				if (row.size() != table.columns()) {
 					XLL_WARNING(__FUNCTION__ ": not all rows have the same size");
