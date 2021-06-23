@@ -55,6 +55,7 @@ int test_csv_parse()
 		xll_test_item();
 		xll_test_csv_skip();
 		xll_test_csv_parse_field();
+		ISO8601::test();
 
 		xcstr buf = _T("ab,cd\ne,fg");
 		OPER o = csv_parse(buf);

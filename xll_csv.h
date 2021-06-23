@@ -1,5 +1,6 @@
 // xll_csv.h - Comma Separated Value
 #pragma once
+#include "ISO8601.h"
 #include "xll/xll/xll.h"
 
 #ifndef CATEGORY
@@ -108,80 +109,6 @@ namespace xll {
 #endif // _DEBUG
 
 	// "2021-06-22T21:30:48.323279+01:00"
-	// Convert ISO 8601 date string to Excel date
-	inline double ISO8601(xcstr s, int len = 0)
-	{
-		static auto date_year = [](xcstr s) {
-			return _istdigit(s[0]) && _istdigit(s[1]) && _istdigit(s[2]) && _istdigit(s[3]);
-		};
-		static auto date_month = [](xcstr s) {
-			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' <= 12;
-		};
-		static auto date_day = [](xcstr s) {
-			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' <= 31;
-		};
-		static auto date_hour = [](xcstr s) {
-			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' < 24;
-		};
-		static auto date_minute = [](xcstr s) {
-			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' < 60;
-		};
-		static auto date_second = [](xcstr s) {
-			return _istdigit(s[0]) && _istdigit(s[1]) && 10 * (s[0] - '0') + s[1] - '0' < 61;
-		};
-		static constexpr double NaN = std::numeric_limits<double>::quiet_NaN();
-
-		if (len == 0) {
-			len = (int)_tcslen(s);
-		}
-
-		// Use built-in data parsing first.
-		OPER o = Excel(xlfValue, OPER(s, len));
-		if (o.is_num()) {
-			OPER o_ = Excel(xlfEvaluate, OPER(s, len));
-			if (o == o_) {
-				return NaN; // its a number, not a date
-			}
-			else {
-				return o.val.num;
-			}
-		}
-
-		if (date_year(s)) {
-			s += 4;
-			if (*s != '-') {
-				return NaN;
-			}
-			++s;
-			if (date_month(s)) {
-				s += 2;
-				if (*s != '-') {
-					return NaN;
-				}
-				if (date_day(s)) {
-					s += 2;
-					if (*s == '.') {
-						// secfrac
-						while (_istdigit(*++s)) {
-							;
-						}
-					}
-					if (*s != 'T') {
-						// yyyy-mm-dd would have already been converted
-						return NaN;
-					}
-					++s;
-					if (date_hour(s)) {
-						if (*s != ':') {
-							return NaN;
-						}
-					}
-				}
-			}
-		}
-
-		return NaN;
-	}
 
 #ifdef _DEBUG
 #endif // _DEBUG
@@ -199,7 +126,7 @@ namespace xll {
 		return nullptr;
 	}
 
-	// skip matching left and right chars
+	// skip matching left and right chars ignoring escape
 	inline xcstr csv_skip(xcstr s, xchar l = _T('\"'), xchar r = _T('\"'), xchar esc = _T('\"'))
 	{
 		if (*s != l) {

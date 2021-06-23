@@ -27,6 +27,9 @@
     <ClInclude Include="libxml2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ISO8601.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp">
