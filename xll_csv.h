@@ -17,10 +17,10 @@ namespace xll::csv {
 	// skip matching left and right chars ignoring escaped
 	inline xcstr skip(xcstr s, xchar l, xchar r, xchar esc)
 	{
-		if (!s) {
-			return s;
+		if (l == esc or r == esc) {
+			return nullptr; 
 		}
-		if (*s != l) {
+		if (!s or *s != l) {
 			return s;
 		}
 
@@ -77,6 +77,8 @@ namespace xll::csv {
 		// always skip escape
 		s = tskip(_T("{a\\}{}}b"));
 		ensure(s && *s == _T('b'));
+		s = tskip(_T("{a\\}{}}b"));
+		ensure(s && *s == _T('b'));
 
 		return 0;
 	}
@@ -86,7 +88,7 @@ namespace xll::csv {
 
 	// offset to separator 
 	template<class T>
-	inline DWORD next(const xll::view<T>& v, xchar s, xchar l, xchar r, xchar e)
+	inline DWORD find(const xll::view<T>& v, xchar s, xchar l, xchar r, xchar e)
 	{
 		DWORD n = 0;
 		while (n < v.len and v.buf[n] and v.buf[n] != s) {
@@ -101,27 +103,88 @@ namespace xll::csv {
 		return n;
 	}
 
+	// next chunk and advance view 
+	template<class T>
+	inline xll::view<T> chop(xll::view<T>& v, xchar s, xchar l, xchar r, xchar e)
+	{
+		DWORD n = find(v, s, l, r, e);
+		xll::view<T> v0(v.buf, n);
+		v.buf += n;
+		v.len -= n;
+		if (v.len) {
+			ensure(v.buf[0] == s);
+			++v.buf;
+			--v.len;
+		}
+
+		return v0;
+	}
+
+
 #ifdef _DEBUG
 
 	template<class T>
-	inline int test_next()
+	inline int test_chop()
 	{
+		const auto tchop = [](auto& v) { 
+			return chop<const T>(v, _T(':'), _T('{'), _T('}'), _T('\\')); 
+		};
 		{
 			xll::view<const T> v(_T("a:b"));
-			DWORD n = next<const T>(v, _T(':'), _T('{'), _T('}'), _T('\\'));
-			ensure(n == 1);
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("a"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+			n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("b"))));
+			ensure(v.equal(xll::view<const T>(_T(""))));
+			n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T(""))));
+			ensure(v.equal(xll::view<const T>(_T(""))));
 		}
 		{
 			xll::view<const T> v(_T(":a:b"));
-			DWORD n = next<const T>(v, _T(':'), _T('{'), _T('}'), _T('\\'));
-			ensure(n == 0);
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T(""))));
+			ensure(v.equal(xll::view<const T>(_T("a:b"))));
+			n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("a"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+			n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("b"))));
+			ensure(v.equal(xll::view<const T>(_T(""))));
 		}
+		{
+			xll::view<const T> v(_T("{a:b}:b"));
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("{a:b}"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+		}
+		{
+			xll::view<const T> v(_T("{a\\{b}:b"));
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("{a\\{b}"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+		}
+		{
+			xll::view<const T> v(_T("{a\\}b}:b"));
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("{a\\}b}"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+		}
+		{
+			xll::view<const T> v(_T("{a{\\}b}c}:b"));
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("{a{\\}b}c}"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+		}
+
 
 		return 0;
 	}
 
 #endif // _DEBUG
 
+	// view iterator
 	template<class T>
 	class iterator {
 		xll::view<T> v;
@@ -133,8 +196,8 @@ namespace xll::csv {
 		iterator()
 			: s(0), l(0), r(0), e(0), n(0)
 		{ }
-		iterator(const xll::view<T>& v, xchar s, xchar l, xchar r, xchar e)
-			: v(v), s(s), l(l), r(r), e(e), n(next(v, s, l, r, e))
+		iterator(const xll::view<T>& _v, xchar s, xchar l, xchar r, xchar e)
+			: v(_v), s(s), l(l), r(r), e(e), n(find(v, s, l, r, e))
 		{ }
 		~iterator()
 		{ }
@@ -147,22 +210,17 @@ namespace xll::csv {
 		}
 		auto end() const
 		{
-			return iterator(xll::view<T>{}, s, l, r, e);
+			return iterator(xll::view<T>(v.buf + v.len, 0), s, l, r, e);
 		}
 		value_type operator*() const
 		{
-			return n ? xll::trim<T>(xll::view<T>(v.buf, n), _T(' ')) : xll::view<T>{};
+			return xll::view<T>(v.buf, n);
 		}
 		iterator& operator++()
 		{
 			if (v) {
-				v.buf += n;
-				v.len -= n;
-				if (v.len and v.buf[0] == s) {
-					++v.buf;
-					--v.len;
-				}
-				n = next(v, s, l, r, e);
+				chop(v, s, l, r, e);
+				n = find(v, s, l, r, e);
 			}
 
 			return *this;
@@ -185,11 +243,32 @@ namespace xll::csv {
 	{
 		{
 			xll::view v(_T("ab\ncd"));
-			xll::csv::iterator i(v, '\n', '"', '"', '"');
+			xll::csv::iterator i(v, '\n', '"', '"', '\\');
 			auto b = i.begin();
-			ensure(*b == xll::view(_T("ab")));
+			ensure((*b).equal(xll::view(_T("ab"))));
 			++b;
-			ensure(*b == xll::view(_T("cd")));
+			ensure((*b).equal(xll::view(_T("cd"))));
+			++b;
+			auto e = i.end();
+			ensure(b == e);
+		}
+		{
+			xll::view v(_T("a\naa\naaa"));
+			xll::view a(_T("aaa"));
+			xll::csv::iterator is(v, '\n', '"', '"', '\\');
+			DWORD n = 1;
+			for (const auto& i : is) {
+				ensure(i.equal(xll::view(a.buf, n)));
+				++n;
+			}
+		}
+		{
+			xll::view v(_T("\"ab\"\ncd"));
+			xll::csv::iterator i(v, '\n', '"', '"', '\\');
+			auto b = i.begin();
+			ensure((*b).equal(xll::view(_T("\"ab\""))));
+			++b;
+			ensure((*b).equal(xll::view(_T("cd"))));
 			++b;
 			ensure(b == i.end());
 		}
@@ -248,23 +327,59 @@ namespace xll::csv {
 	using row = chop<T, ',', '\"', '\"', '\"'>;
 	*/
 
-	inline OPER parse(TCHAR* buf, DWORD len)
+	template<class T>
+	inline OPER parse(const T* buf, DWORD len, T rs, T fs, T l, T r, T e)
 	{
 		OPER o;
-
-		view<TCHAR> lines(buf, len);
-
+		
+		for (const auto& row : iterator(xll::view<const T>(buf, len), rs, l, r, e)) {
+			OPER ro;
+			for (const auto& field : iterator(row, fs, l, r, e)) {
+				ro.push_back(parse_field(field));
+			}
+			ro.resize(1, ro.size());
+			o.push_back(ro);
+		}
+		
 		return o;
 	}
 
 #ifdef _DEBUG
 
 	template<class T>
+	inline int test_parse()
+	{
+		{
+			xll::view v(_T("a,b\nc,d"));
+			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
+			ensure(o.rows() == 2);
+			ensure(o.columns() == 2);
+			ensure(o(0, 0) == "a");
+			ensure(o(0, 1) == "b");
+			ensure(o(1, 0) == "c");
+			ensure(o(1, 1) == "d");
+		}
+		{
+			xll::view v(_T("a,true\n1.23,2001-2-3"));
+			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
+			ensure(o.rows() == 2);
+			ensure(o.columns() == 2);
+			ensure(o(0, 0) == "a");
+			ensure(o(0, 1) == true);
+			ensure(o(1, 0) == 1.23);
+			ensure(o(1, 1) == Excel(xlfDate, OPER(2001), OPER(2), OPER(3)));
+		}
+
+		return 0;
+	}
+
+	template<class T>
 	inline int test()
 	{
 		test_skip<TCHAR>();
-		test_next<TCHAR>();
+		test_chop<TCHAR>();
 		test_iterator<TCHAR>();
+		test_parse<TCHAR>();
 
 		return 0;
 	}
