@@ -282,15 +282,12 @@ namespace xll::csv {
 	template<class T>
 	inline OPER parse_field(view<T> field)
 	{
-		static OPER t("TRUE"), f("FALSE");
-
 		OPER o(field.buf, static_cast<xchar>(field.len));
 		o = Excel(xlfTrim, o);
 
-		// case insensitive
-		if (o == t)
+		if (o.val.str[0] == 4 and 0 == _tcsncmp(o.val.str + 1, _T("TRUE"), 4))
 			return OPER(true);
-		if (o == f)
+		if (o.val.str[0] == 5 and 0 == _tcsncmp(o.val.str + 1, _T("FALSE"), 5))
 			return OPER(false);
 
 		// number or date?
@@ -314,7 +311,8 @@ namespace xll::csv {
 		ensure(parse_field(view(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
 		ensure(parse_field(view(_T("Jan 2, 2020"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
 		ensure(parse_field(view(_T("1:30"))) == OPER(1.5 / 24));
-		ensure(parse_field(view(_T("tRue"))) == OPER(true));
+		ensure(parse_field(view(_T("TRUE"))) == OPER(true));
+		ensure(parse_field(view(_T("true"))) != OPER(true));
 
 		return 0;
 	}
@@ -360,12 +358,12 @@ namespace xll::csv {
 			ensure(o(1, 1) == "d");
 		}
 		{
-			xll::view v(_T("a,true\n1.23,2001-2-3"));
+			xll::view v(_T("abc,FALSE\n1.23,2001-2-3"));
 			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
-			ensure(o(0, 0) == "a");
-			ensure(o(0, 1) == true);
+			ensure(o(0, 0) == "abc");
+			ensure(o(0, 1) == false);
 			ensure(o(1, 0) == 1.23);
 			ensure(o(1, 1) == Excel(xlfDate, OPER(2001), OPER(2), OPER(3)));
 		}
@@ -379,6 +377,7 @@ namespace xll::csv {
 		test_skip<TCHAR>();
 		test_chop<TCHAR>();
 		test_iterator<TCHAR>();
+		test_parse_field();
 		test_parse<TCHAR>();
 
 		return 0;
