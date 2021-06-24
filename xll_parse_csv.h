@@ -4,6 +4,7 @@
 #include <iterator>
 #include "ISO8601.h"
 #include "xll/xll/xll.h"
+#include "xll/xll/codec.h"
 #include "xll_parse.h"
 
 #ifndef CATEGORY
@@ -13,40 +14,27 @@
 namespace xll::parse::csv {
 
 	//!!! use xll::codec
-	template<class T>
-	inline OPER parse_field(view<T> field)
+	template<class X>
+	inline XOPER<X> parse_field(view<const typename traits<X>::xchar> field)
 	{
-		OPER o(field.buf, static_cast<T>(field.len));
-		o = Excel(xlfTrim, o);
+		XOPER<X> o = Excel(xlfTrim, XOPER<X>(field.buf, field.len));
 
-		if (o.val.str[0] == 4 and 0 == _tcsncmp(o.val.str + 1, _T("TRUE"), 4))
-			return OPER(true);
-		if (o.val.str[0] == 5 and 0 == _tcsncmp(o.val.str + 1, _T("FALSE"), 5))
-			return OPER(false);
-
-		// number or date?
-		OPER o_(Excel(xlfValue, o));
-		if (o_) {
-			o = o_;
-		}
-		// ISO 8601???
-
-		return o;
+		return decode<X>(o.val.str + 1, o.val.str[0]);
 	}
 
 #ifdef _DEBUG
 
 	inline int test_parse_field()
 	{
-		ensure(parse_field(view(_T("abc"))) == OPER("abc"));
-		ensure(parse_field(view(_T(" abc "))) == OPER("abc"));
-		ensure(parse_field(view(_T("1.23"))) == OPER(1.23));
-		ensure(parse_field(view(_T("-123"))) == OPER(-123));
-		ensure(parse_field(view(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
-		ensure(parse_field(view(_T("Jan 2, 2020"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
-		ensure(parse_field(view(_T("1:30"))) == OPER(1.5 / 24));
-		ensure(parse_field(view(_T("TRUE"))) == OPER(true));
-		ensure(parse_field(view(_T("true"))) != OPER(true));
+		ensure(parse_field<XLOPERX>(view(_T("abc"))) == "abc");
+		ensure(parse_field<XLOPERX>(view(_T(" abc "))) == "abc");
+		ensure(parse_field<XLOPERX>(view(_T("1.23"))) == 1.23);
+		ensure(parse_field<XLOPERX>(view(_T("-123"))) == -123);
+		ensure(parse_field<XLOPERX>(view(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
+		ensure(parse_field<XLOPERX>(view(_T("Jan 2, 2020"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
+		ensure(parse_field<XLOPERX>(view(_T("1:30"))) == 1.5 / 24);
+		ensure(parse_field<XLOPERX>(view(_T("TRUE"))) == true);
+		ensure(parse_field<XLOPERX>(view(_T("false"))) == false);
 
 		return 0;
 	}
@@ -59,15 +47,15 @@ namespace xll::parse::csv {
 	using row = chop<T, ',', '\"', '\"', '\"'>;
 	*/
 
-	template<class T>
-	inline OPER parse(const T* buf, DWORD len, T rs, T fs, T l, T r, T e)
+	template<class X, class T = typename traits<X>::xchar>
+	inline XOPER<X> parse(const T* buf, DWORD len, T rs, T fs, T l, T r, T e)
 	{
-		OPER o;
+		XOPER<X> o;
 		
 		for (const auto& row : iterator(xll::view<const T>(buf, len), rs, l, r, e)) {
 			OPER ro;
 			for (const auto& field : iterator(row, fs, l, r, e)) {
-				ro.push_back(parse_field(field));
+				ro.push_back(parse_field<X>(field));
 			}
 			ro.resize(1, ro.size());
 			o.push_back(ro);
@@ -83,7 +71,7 @@ namespace xll::parse::csv {
 	{
 		{
 			xll::view v(_T("a,b\nc,d"));
-			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
+			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			ensure(o(0, 0) == "a");
@@ -93,7 +81,7 @@ namespace xll::parse::csv {
 		}
 		{
 			xll::view v(_T("abc,FALSE\n1.23,2001-2-3"));
-			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
+			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			ensure(o(0, 0) == "abc");
