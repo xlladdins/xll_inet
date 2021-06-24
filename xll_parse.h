@@ -1,24 +1,15 @@
-// xll_csv.h - Comma Separated Value
+// xll_parse.h - string parsing
 #pragma once
-#include <compare>
-#include <iterator>
-#include "ISO8601.h"
-#include "xll/xll/xll.h"
+#include "xll/xll/view.h"
 
-#ifndef CATEGORY
-#define CATEGORY "XLL"
-#endif
-
-using xchar = typename xll::traits<XLOPERX>::xchar;
-using xcstr = typename xll::traits<XLOPERX>::xcstr;
-
-namespace xll::csv {
+namespace xll::parse {
 
 	// skip matching left and right chars ignoring escaped
-	inline xcstr skip(xcstr s, xchar l, xchar r, xchar esc)
+	template<class T>
+	inline const T* skip(const T* s, T l, T r, T esc)
 	{
 		if (l == esc or r == esc) {
-			return nullptr; 
+			return nullptr;
 		}
 		if (!s or *s != l) {
 			return s;
@@ -49,7 +40,11 @@ namespace xll::csv {
 	template<class T>
 	inline int test_skip()
 	{
-		auto tskip = [](const TCHAR* s) { return skip(s, _T('{'), _T('}'), _T('\\')); };
+		// delimiters must not equal escape character
+		ensure(nullptr == skip(_T(""), _T('\\'), _T('}'), _T('\\')));
+		ensure(nullptr == skip(_T(""), _T('{'), _T('\\'), _T('\\')));
+
+		auto tskip = [](const T* s) { return skip(s, _T('{'), _T('}'), _T('\\')); };
 
 		LPCTSTR s;
 		s = tskip(nullptr);
@@ -85,10 +80,9 @@ namespace xll::csv {
 
 #endif // _DEBUG
 
-
 	// offset to separator 
 	template<class T>
-	inline DWORD find(const xll::view<T>& v, xchar s, xchar l, xchar r, xchar e)
+	inline DWORD find(const xll::view<const T>& v, T s, T l, T r, T e)
 	{
 		DWORD n = 0;
 		while (n < v.len and v.buf[n] and v.buf[n] != s) {
@@ -105,10 +99,10 @@ namespace xll::csv {
 
 	// next chunk and advance view 
 	template<class T>
-	inline xll::view<T> chop(xll::view<T>& v, xchar s, xchar l, xchar r, xchar e)
+	inline xll::view<const T> chop(xll::view<const T>& v, T s, T l, T r, T e)
 	{
 		DWORD n = find(v, s, l, r, e);
-		xll::view<T> v0(v.buf, n);
+		xll::view<const T> v0(v.buf, n);
 		v.buf += n;
 		v.len -= n;
 		if (v.len) {
@@ -120,14 +114,13 @@ namespace xll::csv {
 		return v0;
 	}
 
-
 #ifdef _DEBUG
 
 	template<class T>
 	inline int test_chop()
 	{
-		const auto tchop = [](auto& v) { 
-			return chop<const T>(v, _T(':'), _T('{'), _T('}'), _T('\\')); 
+		const auto tchop = [](auto& v) {
+			return chop<const T>(v, _T(':'), _T('{'), _T('}'), _T('\\'));
 		};
 		{
 			xll::view<const T> v(_T("a:b"));
@@ -187,16 +180,16 @@ namespace xll::csv {
 	// view iterator
 	template<class T>
 	class iterator {
-		xll::view<T> v;
-		xchar s, l, r, e;
+		xll::view<const T> v;
+		T s, l, r, e;
 		DWORD n;
 	public:
 		using iterator_category = std::forward_iterator_tag;
-		using value_type = view<T>;
+		using value_type = view<const T>;
 		iterator()
 			: s(0), l(0), r(0), e(0), n(0)
 		{ }
-		iterator(const xll::view<T>& _v, xchar s, xchar l, xchar r, xchar e)
+		iterator(const xll::view<const T>& _v, T s, T l, T r, T e)
 			: v(_v), s(s), l(l), r(r), e(e), n(find(v, s, l, r, e))
 		{ }
 		~iterator()
@@ -210,11 +203,11 @@ namespace xll::csv {
 		}
 		auto end() const
 		{
-			return iterator(xll::view<T>(v.buf + v.len, 0), s, l, r, e);
+			return iterator(xll::view<const T>(v.buf + v.len, 0), s, l, r, e);
 		}
 		value_type operator*() const
 		{
-			return xll::view<T>(v.buf, n);
+			return xll::view<const T>(v.buf, n);
 		}
 		iterator& operator++()
 		{
@@ -243,7 +236,7 @@ namespace xll::csv {
 	{
 		{
 			xll::view v(_T("ab\ncd"));
-			xll::csv::iterator i(v, '\n', '"', '"', '\\');
+			xll::parse::iterator i(v, _T('\n'), _T('"'), _T('"'), _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(xll::view(_T("ab"))));
 			++b;
@@ -255,7 +248,7 @@ namespace xll::csv {
 		{
 			xll::view v(_T("a\naa\naaa"));
 			xll::view a(_T("aaa"));
-			xll::csv::iterator is(v, '\n', '"', '"', '\\');
+			xll::parse::iterator is(v, _T('\n'), _T('"'), _T('"'), _T('\\'));
 			DWORD n = 1;
 			for (const auto& i : is) {
 				ensure(i.equal(xll::view(a.buf, n)));
@@ -264,7 +257,7 @@ namespace xll::csv {
 		}
 		{
 			xll::view v(_T("\"ab\"\ncd"));
-			xll::csv::iterator i(v, '\n', '"', '"', '\\');
+			xll::parse::iterator i(v, _T('\n'), _T('"'), _T('"'), _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(xll::view(_T("\"ab\""))));
 			++b;
@@ -278,98 +271,7 @@ namespace xll::csv {
 
 #endif // _DEBUG
 
-	//!!! use xll::codec
-	template<class T>
-	inline OPER parse_field(view<T> field)
-	{
-		OPER o(field.buf, static_cast<xchar>(field.len));
-		o = Excel(xlfTrim, o);
-
-		if (o.val.str[0] == 4 and 0 == _tcsncmp(o.val.str + 1, _T("TRUE"), 4))
-			return OPER(true);
-		if (o.val.str[0] == 5 and 0 == _tcsncmp(o.val.str + 1, _T("FALSE"), 5))
-			return OPER(false);
-
-		// number or date?
-		OPER o_(Excel(xlfValue, o));
-		if (o_) {
-			o = o_;
-		}
-		// ISO 8601???
-
-		return o;
-	}
-
 #ifdef _DEBUG
-
-	inline int test_parse_field()
-	{
-		ensure(parse_field(view(_T("abc"))) == OPER("abc"));
-		ensure(parse_field(view(_T(" abc "))) == OPER("abc"));
-		ensure(parse_field(view(_T("1.23"))) == OPER(1.23));
-		ensure(parse_field(view(_T("-123"))) == OPER(-123));
-		ensure(parse_field(view(_T("2020-1-2"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
-		ensure(parse_field(view(_T("Jan 2, 2020"))) == Excel(xlfDate, OPER(2020), OPER(1), OPER(2)));
-		ensure(parse_field(view(_T("1:30"))) == OPER(1.5 / 24));
-		ensure(parse_field(view(_T("TRUE"))) == OPER(true));
-		ensure(parse_field(view(_T("true"))) != OPER(true));
-
-		return 0;
-	}
-
-#endif // _DEBUG
-	/*
-	template<class T>
-	using line = chop<T, '\n', '\"', '\"', '\"'>;
-	template<class T>
-	using row = chop<T, ',', '\"', '\"', '\"'>;
-	*/
-
-	template<class T>
-	inline OPER parse(const T* buf, DWORD len, T rs, T fs, T l, T r, T e)
-	{
-		OPER o;
-		
-		for (const auto& row : iterator(xll::view<const T>(buf, len), rs, l, r, e)) {
-			OPER ro;
-			for (const auto& field : iterator(row, fs, l, r, e)) {
-				ro.push_back(parse_field(field));
-			}
-			ro.resize(1, ro.size());
-			o.push_back(ro);
-		}
-		
-		return o;
-	}
-
-#ifdef _DEBUG
-
-	template<class T>
-	inline int test_parse()
-	{
-		{
-			xll::view v(_T("a,b\nc,d"));
-			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
-			ensure(o.rows() == 2);
-			ensure(o.columns() == 2);
-			ensure(o(0, 0) == "a");
-			ensure(o(0, 1) == "b");
-			ensure(o(1, 0) == "c");
-			ensure(o(1, 1) == "d");
-		}
-		{
-			xll::view v(_T("abc,FALSE\n1.23,2001-2-3"));
-			OPER o = parse(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
-			ensure(o.rows() == 2);
-			ensure(o.columns() == 2);
-			ensure(o(0, 0) == "abc");
-			ensure(o(0, 1) == false);
-			ensure(o(1, 0) == 1.23);
-			ensure(o(1, 1) == Excel(xlfDate, OPER(2001), OPER(2), OPER(3)));
-		}
-
-		return 0;
-	}
 
 	template<class T>
 	inline int test()
@@ -377,14 +279,10 @@ namespace xll::csv {
 		test_skip<TCHAR>();
 		test_chop<TCHAR>();
 		test_iterator<TCHAR>();
-		test_parse_field();
-		test_parse<TCHAR>();
 
 		return 0;
 	}
 
 #endif // _DEBUG
 
-} // namespace xll::csv
-
-
+} // xll::parse

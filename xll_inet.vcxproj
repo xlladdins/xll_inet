@@ -190,9 +190,10 @@
   <ItemGroup>
     <ClInclude Include="fms_ntp.h" />
     <ClInclude Include="ISO8601.h" />
-    <ClInclude Include="xll_csv.h" />
+    <ClInclude Include="xll_parse_csv.h" />
     <ClInclude Include="xll_inet.h" />
     <ClInclude Include="libxml2.h" />
+    <ClInclude Include="xll_parse.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp" />

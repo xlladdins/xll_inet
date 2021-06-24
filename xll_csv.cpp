@@ -1,7 +1,9 @@
 // xll_csv.cpp - Parse CSV strings
-#include "xll_csv.h"
+#include "xll_parse_csv.h"
 
 using namespace xll;
+
+using xcstr = xll::traits<XLOPERX>::xcstr;
 
 AddIn xai_csv_parse(
 	Function(XLL_LPOPER, "xll_csv_parse", "CSV.PARSE")
@@ -39,7 +41,7 @@ LPOPER WINAPI xll_csv_parse(xcstr /*csv*/ )
 int test_csv_parse()
 {
 	try {
-		xll::csv::test<TCHAR>();
+		xll::parse::csv::test<TCHAR>();
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

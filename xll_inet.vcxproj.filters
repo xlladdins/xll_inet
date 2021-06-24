@@ -21,13 +21,16 @@
     <ClInclude Include="fms_ntp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="xll_csv.h">
+    <ClInclude Include="xll_parse_csv.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="libxml2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ISO8601.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xll_parse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
