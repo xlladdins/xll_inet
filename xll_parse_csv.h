@@ -48,13 +48,13 @@ namespace xll::parse::csv {
 	*/
 
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> parse(const T* buf, DWORD len, T rs, T fs, T l, T r, T e)
+	inline XOPER<X> parse(const T* buf, DWORD len, T rs, T fs, T e)
 	{
 		XOPER<X> o;
 		
-		for (const auto& row : iterator(xll::view<const T>(buf, len), rs, l, r, e)) {
+		for (const auto& row : iterator(xll::view<const T>(buf, len), rs, e)) {
 			OPER ro;
-			for (const auto& field : iterator(row, fs, l, r, e)) {
+			for (const auto& field : iterator(row, fs, e)) {
 				ro.push_back(parse_field<X>(field));
 			}
 			ro.resize(1, ro.size());
@@ -71,7 +71,7 @@ namespace xll::parse::csv {
 	{
 		{
 			xll::view v(_T("a,b\nc,d"));
-			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
+			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\\'));
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			ensure(o(0, 0) == "a");
@@ -81,7 +81,7 @@ namespace xll::parse::csv {
 		}
 		{
 			xll::view v(_T("abc,FALSE\n1.23,2001-2-3"));
-			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\"'), _T('\"'), _T('\\'));
+			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\\'));
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			ensure(o(0, 0) == "abc");

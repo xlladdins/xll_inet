@@ -33,6 +33,9 @@
     <ClInclude Include="xll_parse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="xll_parse_json.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp">
@@ -45,6 +48,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="xll_xml.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="xll_json.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

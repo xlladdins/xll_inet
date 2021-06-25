@@ -194,11 +194,13 @@
     <ClInclude Include="xll_inet.h" />
     <ClInclude Include="libxml2.h" />
     <ClInclude Include="xll_parse.h" />
+    <ClInclude Include="xll_parse_json.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="enum_http_query.cpp" />
     <ClCompile Include="xll_csv.cpp" />
     <ClCompile Include="xll_inet.cpp" />
+    <ClCompile Include="xll_json.cpp" />
     <ClCompile Include="xll_xml.cpp" />
   </ItemGroup>
   <ItemGroup>
