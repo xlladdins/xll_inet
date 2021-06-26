@@ -52,9 +52,9 @@ namespace xll::parse::csv {
 	{
 		XOPER<X> o;
 		
-		for (const auto& row : iterator(xll::view<const T>(buf, len), rs, e)) {
+		for (const auto& row : iterator<T>(xll::view<const T>(buf, len), rs, 0, 0, e)) {
 			OPER ro;
-			for (const auto& field : iterator(row, fs, e)) {
+			for (const auto& field : iterator<T>(row, fs, 0, 0, e)) {
 				ro.push_back(parse_field<X>(field));
 			}
 			ro.resize(1, ro.size());

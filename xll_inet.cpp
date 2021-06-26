@@ -98,7 +98,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
  
         DWORD len = 4096; // ??? page size
         *h_->buf = 0; // buffer index when split
-        char* buf = h_->buf + 1; // allow for count
+        char* buf = h_->buf;
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
             h_->len += len;
             buf += len;
@@ -133,12 +133,13 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
 
     try {
         handle<view<char>> h_(h);
+        ensure(h_ || !"INET.VEW: unrecognized handle");
 
         if (len == 0 or len > static_cast<LONG>(h_->len) - off) {
-            len = h_->len - off - 1;
+            len = h_->len - off;
         }
 
-        result = OPER(h_->buf + off + 1, len);
+        result = OPER(h_->buf + off, len);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
@@ -149,6 +150,7 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     return &result;
 }
 
+#if 0
 // up to 254 instances of split buffers
 static unsigned int buf_index = 0;
 static XLOPER buf_split[255] = { ErrNA4 } ;
@@ -239,7 +241,7 @@ LPXLOPER WINAPI xll_inet_split(HANDLEX h)
 
     return &buf_split[b0];
 }
-
+#endif // 0
 #if 0
 AddIn xai_inet_open(
     Function(XLL_HANDLE, L"?xll_inet_open", L"INET.OPEN")

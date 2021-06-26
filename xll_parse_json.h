@@ -1,13 +1,26 @@
 // xll_parse_json.h - parse JSON to OPER
-// JSON objects map neatly to two colulmn OPERs: the key is the first first column and the value is the second.
-// If the value is a multi then it is either an array or an object.
-// If the multi has 1 column it is an array. If it has 2 columns it is an object.
 #pragma once
 #include "xll/xll/xll.h"
 #include "xll/xll/codec.h"
 #include "xll_parse.h"
 
+static inline const char xll_parse_json_doc[] = R"xyzyx(
+JSON objects map neatly to two row OPERs: the keys are in the first row and the values in the second.
+If the value is a multi then it is either an array or an object.
+If the value is a multi with 1 row it is an array and if it has 2 rows it is an object.
+<p>
+Recall a JSON object has zero or more key-value pairs of the form <code>{ "key" : value, ... }</code>.
+These are correspond to <code>OPER</code>s having two rows.
+A scalar JSON value is either a string, number, boolean, or null.
+These are are parsed to <code>OPER</code> type <code>xltypeStr</code>, <code>xltypeNum</code>,
+<code>xltypeBool</code>, and <code>xltypeErr</code> with <code>.val.err = xlerrNull</code>.
+JSON array values have zero or more values of the form <code>[ value, ... ]</code>.
+JSON objects are also values so the structure is recursive.
+</p>
+)xyzyx";
+
 namespace xll::parse::json {
+
 
 	// forward declaration
 	template<class X, class T>
@@ -22,7 +35,7 @@ namespace xll::parse::json {
 		return XOPER<X>(str.buf, str.len);
 	}
 
-	// object := "{ str : val , ... } "
+	// object := "{ \"str\" : val , ... } "
 	template<class X, class T = typename traits<X>::xchar>
 	inline XOPER<X> object(view<const T> o)
 	{
@@ -33,13 +46,15 @@ namespace xll::parse::json {
 
 		while (kvs = skipws(kvs)) {
 			// key : val , ...
-			auto val = chop<const T>(kvs, ',', '\\');
-			auto key = chop<const T>(val, ':', '\\');
-			x.push_back(XOPER<X>({ string<X>(key), value<X>(val) }));
+			auto val = chop<const T>(kvs, ',', '{', '}', '\\');
+			auto key = chop<const T>(val, ':', '\"', '\"', '\\');
+			XOPER<X> kv({ string<X>(key), value<X>(val) });
+			kv.resize(2, 1);
+			// keys are in first row
+			x.push_back(kv, XOPER<X>::Side::Right);
 		}
 		ensure(!kvs);
 		
-
 		return x;
 	}
 
@@ -53,7 +68,7 @@ namespace xll::parse::json {
 		ensure(!skipws(v));
 
 		while (a = skipws(a)) {
-			auto elem = chop<const T>(a, ',', '\\');
+			auto elem = chop<const T>(a, ',', '{', '}', '\\');
 			x.push_back(value<X>(elem));
 		}
 		ensure(!a);
@@ -117,7 +132,8 @@ namespace xll::parse::json {
 		}
 		{
 			XOPER<X> x = object<X>(view(_T("{\"key\":\"value\"}")));
-			ensure(x.columns() == 2);
+			ensure(x.rows() == 2);
+			ensure(x.columns() == 1);
 			ensure(x[0] == "key");
 			ensure(x[1] == "value");
 		}
@@ -126,8 +142,8 @@ namespace xll::parse::json {
 			ensure(x.rows() == 2);
 			ensure(x.columns() == 2);
 			ensure(x(0,0) == "key");
-			ensure(x(0,1) == "value");
-			ensure(x(1, 0) == "num");
+			ensure(x(1,0) == "value");
+			ensure(x(0,1) == "num");
 			ensure(x(1, 1) == 1.23);
 		}
 		{
@@ -135,8 +151,8 @@ namespace xll::parse::json {
 			ensure(x.rows() == 2);
 			ensure(x.columns() == 2);
 			ensure(x(0, 0) == "key");
-			ensure(x(0, 1) == "value");
-			ensure(x(1, 0) == "num");
+			ensure(x(1, 0) == "value");
+			ensure(x(0, 1) == "num");
 			ensure(x(1, 1) == 1.23);
 		}
 

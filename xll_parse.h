@@ -4,7 +4,7 @@
 
 namespace xll::parse {
 
-	// eat c from front
+	// eat c from front with checking
 	template<class T>
 	inline view<const T> eat(T c, view<const T> v)
 	{
@@ -44,7 +44,7 @@ namespace xll::parse {
 				++n;
 				ensure(n < v.len);
 			}
-			// do first in cass l == r
+			// do first in case l == r
 			if (v.buf[n] == r) {
 				--level;
 			}
@@ -82,9 +82,9 @@ namespace xll::parse {
 
 #endif // _DEBUG
 
-	// find separator in escaped data
+	// find unescaped separator
 	template<class T>
-	inline DWORD find(xll::view<const T>& v, T s, T e)
+	inline DWORD find(xll::view<const T>& v, T s, T l, T r,T e)
 	{
 		DWORD n = 0;
 
@@ -95,20 +95,28 @@ namespace xll::parse {
 				++n;
 				ensure(n < v.len);
 			}
-			++n;
+			if (v.buf[n] == l) {
+				view<const T> vs(v.buf + n, (DWORD)(v.buf - n));
+				n += skip<T>(vs, l, r, e);
+			}
+			else {
+				++n;
+			}
 		};
 
 		return n;
 	}
 		
 	// next chunk and advance view 
-	// "data,..." returns escaped data and updates view to "..."
+	// "{data},..." returns "data" and updates view to "..."
 	template<class T>
-	inline xll::view<const T> chop(xll::view<const T>& v, T s, T e)
+	inline xll::view<const T> chop(xll::view<const T>& v, T s, T l, T r, T e)
 	{
-		DWORD n = find(v, s, e);
-
-		auto data = view<const T>(v.buf, n);
+		v = eat(l, v);
+		DWORD n = find(v, s, l, r, e);
+		ensure(v.buf[n] == r);
+		auto data = view<const T>(v.buf, n - 1);
+		ensure(data.back() == r);
 		v.buf += n;
 		v.len -= n;
 		if (v) {
@@ -156,6 +164,12 @@ namespace xll::parse {
 			ensure(n.equal(xll::view<const T>(_T("{a\\:"))));
 			ensure(v.equal(xll::view<const T>(_T("b"))));
 		}
+		{
+			xll::view<const T> v(_T("{a{b}c}d"));
+			auto n = tchop(v);
+			ensure(n.equal(xll::view<const T>(_T("{a\\:"))));
+			ensure(v.equal(xll::view<const T>(_T("b"))));
+		}
 
 
 		return 0;
@@ -167,16 +181,16 @@ namespace xll::parse {
 	template<class T>
 	class iterator {
 		xll::view<const T> v;
-		T s, e;
+		T s, l, r, e;
 		DWORD n;
 	public:
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = view<const T>;
 		iterator()
-			: s(0), e(0), n(0)
+			: s(0), l(0), r(0), e(0), n(0)
 		{ }
-		iterator(const xll::view<const T>& _v, T s, T e)
-			: v(_v), s(s), e(e), n(find(v, s, e))
+		iterator(const xll::view<const T>& _v, T s, T l, T r, T e)
+			: v(_v), s(s), l(l), r(r), e(e), n(find(v, s, l, r, e))
 		{ }
 		~iterator()
 		{ }
@@ -189,7 +203,7 @@ namespace xll::parse {
 		}
 		auto end() const
 		{
-			return iterator(xll::view<const T>(v.buf + v.len, 0), s, e);
+			return iterator(xll::view<const T>(v.buf + v.len, 0), s, l, r, e);
 		}
 		value_type operator*() const
 		{
@@ -203,7 +217,7 @@ namespace xll::parse {
 				if (v) {
 					v = eat(s, v);
 				}
-				n = find(v, s, e);
+				n = find<const T>(v, s, l, r, e);
 			}
 
 			return *this;
@@ -226,7 +240,7 @@ namespace xll::parse {
 	{
 		{
 			xll::view v(_T("ab\ncd"));
-			xll::parse::iterator i(v, _T('\n'), _T('\\'));
+			xll::parse::iterator i(v, _T('\n'), 0, 0, _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(xll::view(_T("ab"))));
 			++b;
@@ -238,7 +252,7 @@ namespace xll::parse {
 		{
 			xll::view v(_T("a\naa\naaa"));
 			xll::view a(_T("aaa"));
-			xll::parse::iterator is(v, _T('\n'), _T('\\'));
+			xll::parse::iterator is(v, _T('\n'), 0, 0, _T('\\'));
 			DWORD n = 1;
 			for (const auto& i : is) {
 				ensure(i.equal(xll::view(a.buf, n)));
@@ -247,7 +261,7 @@ namespace xll::parse {
 		}
 		{
 			xll::view v(_T("\"ab\"\ncd"));
-			xll::parse::iterator i(v, _T('\n'), _T('\\'));
+			xll::parse::iterator i(v, _T('\n'), 0, 0, _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(xll::view(_T("\"ab\""))));
 			++b;
