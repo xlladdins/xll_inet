@@ -68,21 +68,31 @@ namespace xll::parse {
 	template<class T>
 	inline int test_skip()
 	{
-		auto tskip = [](view<const T> v) { return skip(v, _T('{'), _T('}'), _T('\\')); };
+		{
+			auto tskip = [](view<const T> v) { return skip(v, _T('{'), _T('}'), _T('\\')); };
 
-		ensure(tskip(_T("{a}")).equal(view(_T(""))));
-		ensure(tskip(_T("{a}}")).equal(view(_T("}"))));
-		ensure(tskip(_T("{a{}}bc")).equal(view(_T("bc"))));
-		ensure(tskip(_T("{a\\}}b")).equal(view(_T("b"))));
-		ensure(tskip(_T("{a\\{}b")).equal(view(_T("b"))));
-		ensure(tskip(_T("{a\"b")).equal(view(_T("b"))));
+			ensure(tskip(_T("{a}")).equal(view(_T(""))));
+			ensure(tskip(_T("{a}}")).equal(view(_T("}"))));
+			ensure(tskip(_T("{a{}}bc")).equal(view(_T("bc"))));
+			ensure(tskip(_T("{a\\}}b")).equal(view(_T("b"))));
+			ensure(tskip(_T("{a\\{}b")).equal(view(_T("b"))));
+		}
+		{
+			auto tskip = [](view<const T> v) { return skip(v, _T('|'), _T('|'), 0); };
+
+			ensure(tskip(_T("|a|")).equal(view(_T(""))));
+			ensure(tskip(_T("|a||")).equal(view(_T("|"))));
+			ensure(tskip(_T("|a|||bc")).equal(view(_T("bc"))));
+			ensure(tskip(_T("|a\\||b")).equal(view(_T("|b"))));
+
+		}
 
 		return 0;
 	}
 
 #endif // _DEBUG
 
-	// find unescaped separator
+	// find index of unescaped separator
 	template<class T>
 	inline DWORD find(xll::view<const T>& v, T s, T l, T r,T e)
 	{
@@ -96,8 +106,8 @@ namespace xll::parse {
 				ensure(n < v.len);
 			}
 			if (v.buf[n] == l) {
-				view<const T> vs(v.buf + n, (DWORD)(v.buf - n));
-				n += skip<T>(vs, l, r, e);
+				auto vn = view(v.buf + n, static_cast<DWORD>(v.len - n));
+				n += skip(vn, l, r, e).len;
 			}
 			else {
 				++n;
@@ -107,16 +117,12 @@ namespace xll::parse {
 		return n;
 	}
 		
-	// next chunk and advance view 
-	// "{data},..." returns "data" and updates view to "..."
+	// next chunk up to separator and advance view 
 	template<class T>
 	inline xll::view<const T> chop(xll::view<const T>& v, T s, T l, T r, T e)
 	{
-		v = eat(l, v);
 		DWORD n = find(v, s, l, r, e);
-		ensure(v.buf[n] == r);
-		auto data = view<const T>(v.buf, n - 1);
-		ensure(data.back() == r);
+		auto data = view<const T>(v.buf, n);
 		v.buf += n;
 		v.len -= n;
 		if (v) {
@@ -132,7 +138,7 @@ namespace xll::parse {
 	inline int test_chop()
 	{
 		const auto tchop = [](auto& v) {
-			return chop<const T>(v, _T(':'), _T('\\'));
+			return chop<const T>(v, _T(':'), _T('{'), _T('}'), _T('\\'));
 		};
 		{
 			xll::view<const T> v(_T("a:b"));
@@ -217,7 +223,7 @@ namespace xll::parse {
 				if (v) {
 					v = eat(s, v);
 				}
-				n = find<const T>(v, s, l, r, e);
+				n = find(v, s, l, r, e); // n = chop().len
 			}
 
 			return *this;

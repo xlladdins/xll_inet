@@ -6,11 +6,10 @@
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
 JSON objects map neatly to two row OPERs: the keys are in the first row and the values in the second.
-If the value is a multi then it is either an array or an object.
-If the value is a multi with 1 row it is an array and if it has 2 rows it is an object.
+If a value is a multi then it is either an array or an object.
+If a value is a multi with 1 row it is an array and if it has 2 rows it is an object.
 <p>
 Recall a JSON object has zero or more key-value pairs of the form <code>{ "key" : value, ... }</code>.
-These are correspond to <code>OPER</code>s having two rows.
 A scalar JSON value is either a string, number, boolean, or null.
 These are are parsed to <code>OPER</code> type <code>xltypeStr</code>, <code>xltypeNum</code>,
 <code>xltypeBool</code>, and <code>xltypeErr</code> with <code>.val.err = xlerrNull</code>.
@@ -21,15 +20,52 @@ JSON objects are also values so the structure is recursive.
 
 namespace xll::parse::json {
 
+	// multi-level index into JSON value
+	template<class X>
+	inline XOPER<X> index(const XOPER<X>& v, XOPER<X> i)
+	{
+		if (v.is_multi()) {
+			if (v.rows() == 1) { // array
+				ensure(i[0].is_num());
+				const XOPER<X>& vi = v[(unsigned)i[0].val.num];
+
+				return i.size() == 1 ? vi : index(vi, i.drop(1));
+			}
+			else if (v.rows() == 2) { // object
+				if (i[0].is_num()) {
+					const XOPER<X>& vi = v(1, (unsigned)i[0].val.num);
+
+					return i.size() == 1 ? vi : index(vi, i.drop(1));
+				}
+				else {
+					X v1 = v; // first row of v
+					v1.val.array.rows = 1;
+					XOPER<X> match = Excel(xlfMatch, v1, i[0], XOPER<X>(0)); // exact
+					ensure(match.is_num());
+					const XOPER<X>& vi = v(1, (unsigned)match.val.num - 1);
+
+					return i.size() == 1 ? vi : index(vi, i.drop(1));
+				}
+			}
+			else {
+				return XOPER<X>(XOPER<X>::Err::NA);
+			}
+		}
+
+		ensure(i == 0);
+
+		return v;
+	}
 
 	// forward declaration
 	template<class X, class T>
 	XOPER<X> value(view<const T> v);
 
+	// "\"str\"" => "str"
 	template<class X, class T = typename traits<X>::xchar>
 	inline XOPER<X> string(view<const T> v)
 	{
-		auto str = skip<const T>(v, '"', '"', '\\');
+		auto str = skip<T>(v, '"', '"', '\\');
 		ensure(!skipws(v));
 
 		return XOPER<X>(str.buf, str.len);
@@ -37,23 +73,22 @@ namespace xll::parse::json {
 
 	// object := "{ \"str\" : val , ... } "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> object(view<const T> o)
+	inline XOPER<X> object(view<const T> v)
 	{
 		XOPER<X> x;
 
-		auto kvs = skip<const T>(o, '{', '}', '\\');
-		ensure(!skipws(o));
+		auto o = skip<T>(v, '{', '}', '\\');
+		ensure(!skipws(v));
 
-		while (kvs = skipws(kvs)) {
+		while (o = skipws(o)) {
 			// key : val , ...
-			auto val = chop<const T>(kvs, ',', '{', '}', '\\');
-			auto key = chop<const T>(val, ':', '\"', '\"', '\\');
-			XOPER<X> kv({ string<X>(key), value<X>(val) });
+			auto val = chop<const T>(o, ',', '{', '}', '\\');
+			auto key = chop<const T>(val, ':', '"', '"', '\\');
+			XOPER<X> kv = XOPER<X>({ string<X>(key), value<X>(val) });
 			kv.resize(2, 1);
 			// keys are in first row
 			x.push_back(kv, XOPER<X>::Side::Right);
 		}
-		ensure(!kvs);
 		
 		return x;
 	}
@@ -64,16 +99,14 @@ namespace xll::parse::json {
 	{
 		XOPER<X> x;
 
-		auto a = skip<const T>(v, '[', ']', '\\');
+		auto a = skip<T>(v, '[', ']', '\\');
 		ensure(!skipws(v));
 
 		while (a = skipws(a)) {
-			auto elem = chop<const T>(a, ',', '{', '}', '\\');
-			x.push_back(value<X>(elem));
+			x.push_back(value<X>(chop<T>(a, ',', '{', '}', '\\')));
 		}
-		ensure(!a);
 
-		x.resize(x.size(), 1);
+		x.resize(1, x.size());
 
 		return x;
 	}
@@ -154,6 +187,11 @@ namespace xll::parse::json {
 			ensure(x(1, 0) == "value");
 			ensure(x(0, 1) == "num");
 			ensure(x(1, 1) == 1.23);
+		}
+		{
+			//XOPER<X> x = object<X>(view(_T("{\"entities\":{\"Q64\":{\"type\":\"item\",\"id\":\"Q64\",\"descriptions\":{\"en\":{\"language\":\"en\",\"value\":\"federal state, capitaland largest city of Germany\"}}}},\"success\":1}")));
+			XOPER<X> x = object<X>(view(_T("{\"a\":{\"b\":\"ab\"}}")));
+			ensure(x.rows() == 2);
 		}
 
 		return 0;

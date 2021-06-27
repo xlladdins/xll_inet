@@ -61,34 +61,15 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 	static OPER o;
 
 	try {
-		XLOPERX x;
 		if (pjson->is_num()) {
 			handle<OPER> h_(pjson->val.num);
 			ensure(h_);
-			ensure(h_->rows() == 2);
-			x = *h_.ptr(); // current JSON node
+
+			o = parse::json::index(*h_, *pindex);
 		}
 		else {
-			x = *pjson;
+			o = parse::json::index(*pjson, *pindex);
 		}
-
-		for (const OPER& i : *pindex) {
-			DWORD match;
-			if (i.is_num()) {
-				match = (DWORD)i.val.num - 1; // 1-base index
-			}
-			else {
-				ensure(x.val.array.rows == 2);
-				x.val.array.rows = 1; // only keys
-				OPER mi = Excel(xlfMatch, i, x, OPER(0)); // exact
-				x.val.array.rows = 2;
-				ensure(mi);
-				match = (DWORD)mi.val.num - 1;
-			}
-			x = index(x, 1, match);
-		}
-
-		o = x;
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
