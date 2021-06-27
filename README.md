@@ -39,4 +39,5 @@ then call `XML.NODE.*` functions to get types, names, paths, and content.
 
 http://worldtimeapi.org/pages/schema
 http://worldtimeapi.org/api/timezone/Europe/London.txt
+https://www.wikidata.org/w/api.php?action=wbgetentities&sites=enwiki&titles=Berlin&props=descriptions&languages=en&format=json
 

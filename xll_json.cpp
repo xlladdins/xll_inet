@@ -1,11 +1,13 @@
 #include "xll_parse_json.h"
 
-using namespace xll;
-
+using namespace fms;
 using namespace xll;
 
 using xcstr = xll::traits<XLOPERX>::xcstr;
 using xchar = xll::traits<XLOPERX>::xchar;
+
+// JSON.KEY(_pattern) all keys matching pattern
+// JSON.VALUE(index, ...) values matching index
 
 AddIn xai_parse_json(
 	Function(XLL_LPOPER, "xll_parse_json", "JSON.PARSE")
@@ -30,7 +32,7 @@ LPOPER WINAPI xll_parse_json(xcstr csv)
 	static OPER o;
 
 	try {
-		o = xll::parse::json::object<XLOPERX>(view(csv + 1, csv[0]));
+		o = xll::parse::json::object<XLOPERX>(fms::view(csv + 1, csv[0]));
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

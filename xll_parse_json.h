@@ -1,7 +1,7 @@
 // xll_parse_json.h - parse JSON to OPER
 #pragma once
 #include "xll/xll/xll.h"
-#include "xll/xll/codec.h"
+#include "xll/xll/xll_codec.h"
 #include "xll_parse.h"
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
@@ -59,11 +59,11 @@ namespace xll::parse::json {
 
 	// forward declaration
 	template<class X, class T>
-	XOPER<X> value(view<const T> v);
+	XOPER<X> value(fms::view<const T> v);
 
 	// "\"str\"" => "str"
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> string(view<const T> v)
+	inline XOPER<X> string(fms::view<const T> v)
 	{
 		auto str = skip<T>(v, '"', '"', '\\');
 		ensure(!skipws(v));
@@ -73,7 +73,7 @@ namespace xll::parse::json {
 
 	// object := "{ \"str\" : val , ... } "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> object(view<const T> v)
+	inline XOPER<X> object(fms::view<const T> v)
 	{
 		XOPER<X> x;
 
@@ -95,7 +95,7 @@ namespace xll::parse::json {
 
 	// array := "[ value , ... ] "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> array(view<const T> v)
+	inline XOPER<X> array(fms::view<const T> v)
 	{
 		XOPER<X> x;
 
@@ -112,7 +112,7 @@ namespace xll::parse::json {
 	}
 
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> value(view<const T> v)
+	inline XOPER<X> value(fms::view<const T> v)
 	{
 		v = skipws(v);
 		
@@ -127,7 +127,7 @@ namespace xll::parse::json {
 		}
 
 		// more decode tests!!!
-		return decode<X>(v.buf, v.len);
+		return decode<X>(v);
 	}
 
 
@@ -137,41 +137,41 @@ namespace xll::parse::json {
 	inline int test()
 	{
 		{
-			XOPER<X> x = string<X>(view(_T("\"str\"")));
+			XOPER<X> x = string<X>(fms::view(_T("\"str\"")));
 			ensure(x == "str");
 		}
 		{
-			XOPER<X> x = string<X>(view(_T("\"s\\\"r\"")));
+			XOPER<X> x = string<X>(fms::view(_T("\"s\\\"r\"")));
 			ensure(x == "s\\\"r");
 		}
 		{
-			XOPER<X> x = string<X>(view(_T("\"s\nr\"")));
+			XOPER<X> x = string<X>(fms::view(_T("\"s\nr\"")));
 			ensure(x == "s\nr");
 		}
 		{
-			XOPER<X> x = string<X>(view(_T("\"s r\"")));
+			XOPER<X> x = string<X>(fms::view(_T("\"s r\"")));
 			ensure(x == "s r");
 		}
 		{
-			XOPER<X> x = array<X>(view(_T("[\"a\", 1.23, FALSE]")));
+			XOPER<X> x = array<X>(fms::view(_T("[\"a\", 1.23, FALSE]")));
 			ensure(x.size() == 3);
 			ensure(x[0] == "a");
 			ensure(x[1] == 1.23);
 			ensure(x[2] == false);
 		}
 		{
-			XOPER<X> x = object<X>(view(_T("{}")));
+			XOPER<X> x = object<X>(fms::view(_T("{}")));
 			ensure(x == XOPER<X>{});
 		}
 		{
-			XOPER<X> x = object<X>(view(_T("{\"key\":\"value\"}")));
+			XOPER<X> x = object<X>(fms::view(_T("{\"key\":\"value\"}")));
 			ensure(x.rows() == 2);
 			ensure(x.columns() == 1);
 			ensure(x[0] == "key");
 			ensure(x[1] == "value");
 		}
 		{
-			XOPER<X> x = object<X>(view(_T("{\"key\":\"value\",\"num\":1.23}")));
+			XOPER<X> x = object<X>(fms::view(_T("{\"key\":\"value\",\"num\":1.23}")));
 			ensure(x.rows() == 2);
 			ensure(x.columns() == 2);
 			ensure(x(0,0) == "key");
@@ -180,7 +180,7 @@ namespace xll::parse::json {
 			ensure(x(1, 1) == 1.23);
 		}
 		{
-			XOPER<X> x = object<X>(view(_T("{ \"key\" : \"value\" , \"num\" : 1.23 } ")));
+			XOPER<X> x = object<X>(fms::view(_T("{ \"key\" : \"value\" , \"num\" : 1.23 } ")));
 			ensure(x.rows() == 2);
 			ensure(x.columns() == 2);
 			ensure(x(0, 0) == "key");
@@ -189,8 +189,8 @@ namespace xll::parse::json {
 			ensure(x(1, 1) == 1.23);
 		}
 		{
-			//XOPER<X> x = object<X>(view(_T("{\"entities\":{\"Q64\":{\"type\":\"item\",\"id\":\"Q64\",\"descriptions\":{\"en\":{\"language\":\"en\",\"value\":\"federal state, capitaland largest city of Germany\"}}}},\"success\":1}")));
-			XOPER<X> x = object<X>(view(_T("{\"a\":{\"b\":\"ab\"}}")));
+			//XOPER<X> x = object<X>(fms::view(_T("{\"entities\":{\"Q64\":{\"type\":\"item\",\"id\":\"Q64\",\"descriptions\":{\"en\":{\"language\":\"en\",\"value\":\"federal state, capitaland largest city of Germany\"}}}},\"success\":1}")));
+			XOPER<X> x = object<X>(fms::view(_T("{\"a\":{\"b\":\"ab\"}}")));
 			ensure(x.rows() == 2);
 		}
 

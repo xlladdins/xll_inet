@@ -102,7 +102,7 @@ HANDLEX WINAPI xll_xml_document(HANDLEX str, const char* url, const char* encodi
 	HANDLEX h = INVALID_HANDLEX;
 
 	try {
-		handle<view<char>> str_(str);
+		handle<fms::view<char>> str_(str);
 		//options |= XML_PARSE_HUGE;
 		if (!*url) url = nullptr;
 		if (!*encoding) encoding = nullptr;

@@ -89,7 +89,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     HANDLEX h = INVALID_HANDLEX;
 
     try {
-        handle<view<char>> h_(new mem_view);
+        handle<fms::view<char>> h_(new win::mem_view);
         
         DWORD_PTR context = NULL;
         OPER head = headers(*pheaders);
@@ -132,7 +132,7 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
     static OPER result;
 
     try {
-        handle<view<char>> h_(h);
+        handle<fms::view<char>> h_(h);
         ensure(h_ || !"INET.VEW: unrecognized handle");
 
         if (len == 0 or len > static_cast<LONG>(h_->len) - off) {
@@ -175,7 +175,7 @@ LPXLOPER WINAPI xll_inet_split(HANDLEX h)
     unsigned int b0 = 0;
 
     try {
-        handle<view<char>> h_(h);
+        handle<fms::view<char>> h_(h);
         ensure(h_ || !"INET.SPLIT: unrecognized handle");
 
         char* b = h_->buf;

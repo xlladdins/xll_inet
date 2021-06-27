@@ -2,6 +2,7 @@
 #pragma once
 #include "xll/xll/xll.h"
 #include "xll/xll/win.h"
+#include "xll/xll/win_view.h"
 #include <wininet.h>
 
 #pragma comment(lib, "Wininet.lib")
