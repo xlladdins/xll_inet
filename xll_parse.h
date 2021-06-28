@@ -107,7 +107,7 @@ namespace xll::parse {
 			}
 			if (v.buf[n] == l) {
 				auto vn = fms::view(v.buf + n, static_cast<DWORD>(v.len - n));
-				n += skip(vn, l, r, e).len;
+				n += skip(vn, l, r, e).len + 2; // count l and r
 			}
 			else {
 				++n;
