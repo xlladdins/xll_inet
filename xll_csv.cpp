@@ -42,19 +42,6 @@ LPOPER WINAPI xll_csv_parse(xcstr csv)
 
 #ifdef _DEBUG
 
-int test_csv_parse()
-{
-	try {
-//		xll::parse::csv::test<TCHAR>();
-	}
-	catch (const std::exception& ex) {
-		XLL_ERROR(ex.what());
-
-		return FALSE;
-	}
-
-	return TRUE;
-}
-Auto<OpenAfter> xaoa_test_csv_parse(test_csv_parse);
+Auto<OpenAfter> xaoa_test_csv_parse([]() { return xll::parse::csv::test<TCHAR>() == 0; });
 
 #endif // _DEBUG

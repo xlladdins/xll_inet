@@ -4,7 +4,7 @@
 #include <iterator>
 #include "ISO8601.h"
 #include "xll/xll/xll.h"
-#include "xll/xll/codec.h"
+//#include "xll/xll/codec.h"
 #include "xll_parse.h"
 
 #ifndef CATEGORY

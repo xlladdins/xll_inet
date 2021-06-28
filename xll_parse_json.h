@@ -66,7 +66,6 @@ namespace xll::parse::json {
 	inline XOPER<X> string(fms::view<const T> v)
 	{
 		auto str = skip<T>(v, '"', '"', '\\');
-		ensure(!v.skipws());
 
 		return XOPER<X>(str.buf, str.len);
 	}
@@ -100,7 +99,6 @@ namespace xll::parse::json {
 		XOPER<X> x;
 
 		auto a = skip<T>(v, '[', ']', '\\');
-		ensure(!v.skipws());
 
 		while (a.skipws()) {
 			x.push_back(value<X>(chop<T>(a, ',', '{', '}', '\\')));
@@ -127,24 +125,29 @@ namespace xll::parse::json {
 		}
 
 		// more decode tests!!!
-		return decode<X>(v);
+		XOPER<X> val = decode<X,T>(v);
+		static XOPER<X> xnull("null");
+		static XOPER<X> null(XOPER<X>::Err::Null);
+
+		return val == xnull ? null : val;
 	}
 
 
 #ifdef _DEBUG
 
 #define XLL_PARSE_JSON_VALUE(X) \
+	X("null", OPER(OPER::Err::Null)) \
 	X("\"str\"", "str") \
 	X("\"s\\\"r\"", "s\\\"r") \
 	X("\"s\nr\"", "s\nr") \
 	X("\"s r\"", "s r") \
 	X("[\"a\", 1.23, FALSE]", OPER({OPER("a"), OPER(1.23), OPER(false)})) \
-	X("{\"key\":\"value\"}", OPER({OPER("key"), OPER("value")})) \
-	X("{\"key\":\"value\",\"num\":1.23}}", OPER({OPER("key"), OPER("value"), OPER("num"), OPER(1.23)}).resize(2,2)) \
-	X(" { \"key\" : \"value\" , \"num\" : 1.23 } }", OPER({OPER("key"), OPER("value"), OPER("num"), OPER(1.23)}).resize(2,2)) \
-	X("\r{ \"key\" \t\n: \r\"value\"\r ,\n\t \"num\" : 1.23 } }", OPER({OPER("key"), OPER("value"), OPER("num"), OPER(1.23)}).resize(2,2)) \
-	X("{\"a\":{\"b\":\"ab\"}}", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(1,2)}).resize(2,1)) \
-	X(" { \"a\":\n{\"b\":\r\n\t\"ab\" } }", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(1,2)}).resize(2,1)) \
+	X("{\"key\":\"value\"}", OPER({OPER("key"), OPER("value")}).resize(2,1)) \
+	X("{\"key\":\"value\",\"num\":1.23}", OPER({OPER("key"), OPER("num"), OPER("value"), OPER(1.23)}).resize(2,2)) \
+	X(" { \"key\" : \"value\" , \"num\" : 1.23 }", OPER({OPER("key"), OPER("num"), OPER("value"), OPER(1.23)}).resize(2,2)) \
+	X("\r{ \"key\" \t\n: \r\"value\"\r ,\n\t \"num\" : 1.23  }", OPER({OPER("key"), OPER("num"), OPER("value"), OPER(1.23)}).resize(2,2)) \
+	X("{\"a\":{\"b\":\"ab\"}}", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(2,1)}).resize(2,1)) \
+	X(" { \"a\":\n{\"b\":\r\n\t\"ab\" } }", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(2,1)}).resize(2,1)) \
 
 	template<class X>
 	inline int test()
