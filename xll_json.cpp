@@ -20,7 +20,7 @@ AddIn xai_parse_json(
 	.Documentation(xll_parse_json_doc)
 	.Documentation(R"(
 <p>
-An multi data type is a two dimension range of <code>OPER</code>s. Each
+A multi data type is a two dimension range of <code>OPER</code>s. Each
 element of the range can be another multi, but Excel has no way of
 displying these. 
 </p>
@@ -32,7 +32,7 @@ LPOPER WINAPI xll_parse_json(xcstr csv)
 	static OPER o;
 
 	try {
-		o = xll::parse::json::object<XLOPERX>(fms::view(csv + 1, csv[0]));
+		o = xll::parse::json::value<XLOPERX>(fms::view(csv + 1, csv[0]));
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

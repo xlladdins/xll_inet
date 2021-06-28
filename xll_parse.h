@@ -4,27 +4,6 @@
 
 namespace xll::parse {
 
-	// eat c from front with checking
-	template<class T>
-	inline fms::view<const T> eat(T c, fms::view<const T> v)
-	{
-		ensure(v.front() == c);
-		++v.buf;
-		--v.len;
-
-		return v;
-	}
-	// skip leading white space
-	template<class T>
-	inline fms::view<const T> skipws(fms::view<const T> v)
-	{
-		while (isspace(v.front())) {
-			v = eat(v.front(), v);
-		}
-
-		return v;
-	}
-
 	// skip matching left and right chars ignoring escaped
 	// "{data}..." returns escaped "data" an updates fms::view to "..."
 	template<class T>
@@ -33,7 +12,7 @@ namespace xll::parse {
 		// delimiters can't be used as escape
 		ensure(l != e and r != e);
 
-		v = eat(l, v);
+		v.eat(l);
 		int level = 1;
 
 		DWORD n = 0;
@@ -126,7 +105,7 @@ namespace xll::parse {
 		v.buf += n;
 		v.len -= n;
 		if (v) {
-			v = eat(s, v);
+			v.eat(s);
 		}
 
 		return data;
@@ -221,7 +200,7 @@ namespace xll::parse {
 				v.buf += n;
 				v.len -= n;
 				if (v) {
-					v = eat(s, v);
+					v.eat(s);
 				}
 				n = find(v, s, l, r, e); // n = chop().len
 			}

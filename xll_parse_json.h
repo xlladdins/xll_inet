@@ -5,7 +5,7 @@
 #include "xll_parse.h"
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
-JSON objects map neatly to two row OPERs: the keys are in the first row and the values in the second.
+JSON objects map neatly to two row <code>OPER</code>s: the keys are in the first row and the values in the second.
 If a value is a multi then it is either an array or an object.
 If a value is a multi with 1 row it is an array and if it has 2 rows it is an object.
 <p>
@@ -40,7 +40,7 @@ namespace xll::parse::json {
 				else {
 					X v1 = v; // first row of v
 					v1.val.array.rows = 1;
-					XOPER<X> match = Excel(xlfMatch, v1, i[0], XOPER<X>(0)); // exact
+					XOPER<X> match = Excel(xlfMatch, i[0], v1, XOPER<X>(0)); // exact
 					ensure(match.is_num());
 					const XOPER<X>& vi = v(1, (unsigned)match.val.num - 1);
 
@@ -66,7 +66,7 @@ namespace xll::parse::json {
 	inline XOPER<X> string(fms::view<const T> v)
 	{
 		auto str = skip<T>(v, '"', '"', '\\');
-		ensure(!skipws(v));
+		ensure(!v.skipws());
 
 		return XOPER<X>(str.buf, str.len);
 	}
@@ -78,9 +78,9 @@ namespace xll::parse::json {
 		XOPER<X> x;
 
 		auto o = skip<T>(v, '{', '}', '\\');
-		ensure(!skipws(v));
+		ensure(!v.skipws());
 
-		while (o = skipws(o)) {
+		while (o.skipws()) {
 			// key : val , ...
 			auto val = chop<const T>(o, ',', '{', '}', '\\');
 			auto key = chop<const T>(val, ':', '"', '"', '\\');
@@ -100,9 +100,9 @@ namespace xll::parse::json {
 		XOPER<X> x;
 
 		auto a = skip<T>(v, '[', ']', '\\');
-		ensure(!skipws(v));
+		ensure(!v.skipws());
 
-		while (a = skipws(a)) {
+		while (a.skipws()) {
 			x.push_back(value<X>(chop<T>(a, ',', '{', '}', '\\')));
 		}
 
@@ -114,7 +114,7 @@ namespace xll::parse::json {
 	template<class X, class T = typename traits<X>::xchar>
 	inline XOPER<X> value(fms::view<const T> v)
 	{
-		v = skipws(v);
+		v.skipws();
 		
 		if (v.front() == '{') {
 			return object<X>(v);
@@ -133,70 +133,34 @@ namespace xll::parse::json {
 
 #ifdef _DEBUG
 
+#define XLL_PARSE_JSON_VALUE(X) \
+	X("\"str\"", "str") \
+	X("\"s\\\"r\"", "s\\\"r") \
+	X("\"s\nr\"", "s\nr") \
+	X("\"s r\"", "s r") \
+	X("[\"a\", 1.23, FALSE]", OPER({OPER("a"), OPER(1.23), OPER(false)})) \
+	X("{\"key\":\"value\"}", OPER({OPER("key"), OPER("value")})) \
+	X("{\"key\":\"value\",\"num\":1.23}}", OPER({OPER("key"), OPER("value"), OPER("num"), OPER(1.23)}).resize(2,2)) \
+	X(" { \"key\" : \"value\" , \"num\" : 1.23 } }", OPER({OPER("key"), OPER("value"), OPER("num"), OPER(1.23)}).resize(2,2)) \
+	X("\r{ \"key\" \t\n: \r\"value\"\r ,\n\t \"num\" : 1.23 } }", OPER({OPER("key"), OPER("value"), OPER("num"), OPER(1.23)}).resize(2,2)) \
+	X("{\"a\":{\"b\":\"ab\"}}", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(1,2)}).resize(2,1)) \
+	X(" { \"a\":\n{\"b\":\r\n\t\"ab\" } }", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(1,2)}).resize(2,1)) \
+
 	template<class X>
 	inline int test()
 	{
-		{
-			XOPER<X> x = string<X>(fms::view(_T("\"str\"")));
-			ensure(x == "str");
-		}
-		{
-			XOPER<X> x = string<X>(fms::view(_T("\"s\\\"r\"")));
-			ensure(x == "s\\\"r");
-		}
-		{
-			XOPER<X> x = string<X>(fms::view(_T("\"s\nr\"")));
-			ensure(x == "s\nr");
-		}
-		{
-			XOPER<X> x = string<X>(fms::view(_T("\"s r\"")));
-			ensure(x == "s r");
-		}
-		{
-			XOPER<X> x = array<X>(fms::view(_T("[\"a\", 1.23, FALSE]")));
-			ensure(x.size() == 3);
-			ensure(x[0] == "a");
-			ensure(x[1] == 1.23);
-			ensure(x[2] == false);
-		}
-		{
-			XOPER<X> x = object<X>(fms::view(_T("{}")));
-			ensure(x == XOPER<X>{});
-		}
-		{
-			XOPER<X> x = object<X>(fms::view(_T("{\"key\":\"value\"}")));
-			ensure(x.rows() == 2);
-			ensure(x.columns() == 1);
-			ensure(x[0] == "key");
-			ensure(x[1] == "value");
-		}
-		{
-			XOPER<X> x = object<X>(fms::view(_T("{\"key\":\"value\",\"num\":1.23}")));
-			ensure(x.rows() == 2);
-			ensure(x.columns() == 2);
-			ensure(x(0,0) == "key");
-			ensure(x(1,0) == "value");
-			ensure(x(0,1) == "num");
-			ensure(x(1, 1) == 1.23);
-		}
-		{
-			XOPER<X> x = object<X>(fms::view(_T("{ \"key\" : \"value\" , \"num\" : 1.23 } ")));
-			ensure(x.rows() == 2);
-			ensure(x.columns() == 2);
-			ensure(x(0, 0) == "key");
-			ensure(x(1, 0) == "value");
-			ensure(x(0, 1) == "num");
-			ensure(x(1, 1) == 1.23);
-		}
-		{
-			//XOPER<X> x = object<X>(fms::view(_T("{\"entities\":{\"Q64\":{\"type\":\"item\",\"id\":\"Q64\",\"descriptions\":{\"en\":{\"language\":\"en\",\"value\":\"federal state, capitaland largest city of Germany\"}}}},\"success\":1}")));
-			XOPER<X> x = object<X>(fms::view(_T("{\"a\":{\"b\":\"ab\"}}")));
-			ensure(x.rows() == 2);
-		}
+#define PARSE_JSON_CHECK(a, b) { ensure(value<X>(fms::view(_T(a))) == b); }
+		XLL_PARSE_JSON_VALUE(PARSE_JSON_CHECK)
+#undef PARSE_JSON_CHECK
+
+		OPER x = object<XLOPERX>(fms::view(_T("{\"a\":{\"b\":\"cd\"}}")));
+		OPER i({ OPER("a"), OPER("b") });
+		ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2,1));
+		ensure(json::index(x, i) == "cd");
 
 		return 0;
 	}
-
+#undef XLL_PARSE_JSON_VALUE
 #endif // _DEBUG
 
 }
