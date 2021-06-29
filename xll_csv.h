@@ -1,4 +1,4 @@
-// xll_parse_csv.h - Comma Separated Value
+// xll_csv.h - Comma Separated Value
 #pragma once
 #include <compare>
 #include <iterator>
@@ -11,13 +11,13 @@
 #define CATEGORY "XLL"
 #endif
 
-namespace xll::parse::csv {
+namespace xll::csv {
 
 	//!!! use xll::codec
-	template<class X>
-	inline XOPER<X> parse_field(fms::view<const typename traits<X>::xchar> field)
+	template<class X, class T = typename traits<X>::xchar>
+	inline XOPER<X> field(fms::view<const T> field)
 	{
-		return decode<X>(field);
+		return decode<X, T>(field);
 	}
 
 	/*
@@ -32,13 +32,13 @@ namespace xll::parse::csv {
 	{
 		XOPER<X> o;
 		
-		for (const auto& row : iterator<T>(fms::view<const T>(buf, len), rs, 0, 0, e)) {
-			OPER ro;
-			for (const auto& field : iterator<T>(row, fs, 0, 0, e)) {
-				ro.push_back(parse_field<X>(field));
+		for (const auto& r : iterator<T>(fms::view<const T>(buf, len), rs, 0, 0, e)) {
+			OPER row;
+			for (const auto& f : iterator<T>(r, fs, 0, 0, e)) {
+				row.push_back(field<X,T>(f));
 			}
-			ro.resize(1, ro.size());
-			o.push_back(ro);
+			row.resize(1, row.size());
+			o.push_back(row);
 		}
 		
 		return o;

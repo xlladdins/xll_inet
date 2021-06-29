@@ -1,4 +1,4 @@
-// xll_parse_json.h - parse JSON to OPER
+// xll_json.h - JSON to and from OPER
 #pragma once
 #include "xll/xll/xll.h"
 #include "xll/xll/xll_codec.h"
@@ -18,7 +18,27 @@ JSON objects are also values so the structure is recursive.
 </p>
 )xyzyx";
 
-namespace xll::parse::json {
+namespace xll::json {
+
+	// JSON construction
+	template<class... Os>
+	inline xll::OPER array(const Os&... os)
+	{
+		return xll::OPER({ xll::OPER(os)... }).resize(1, static_cast<unsigned>(sizeof...(os)));
+	}
+	// { k, ..., v, ...}
+	template<class... Os>
+	inline xll::OPER object(const Os&... os)
+	{
+		static_assert(0 == sizeof...(os) % 2);
+
+		return array(os...).resize(2, static_cast<unsigned>(sizeof...(os)/2));
+	}
+
+	inline OPER string(const OPER& s)
+	{
+		return OPER("\"") & Excel(xlfSubstitute, s, OPER("\""), OPER("\\\"")) & OPER("\"");
+	}
 
 	// multi-level index into JSON value
 	template<class X>
@@ -26,7 +46,7 @@ namespace xll::parse::json {
 	{
 		if (v.is_multi()) {
 			if (v.rows() == 1) { // array
-				ensure(i[0].is_num());
+				if (!i[0].is_num()) return XErrNA<X>;
 				const XOPER<X>& vi = v[(unsigned)i[0].val.num];
 
 				return i.size() == 1 ? vi : index(vi, i.drop(1));
@@ -41,21 +61,25 @@ namespace xll::parse::json {
 					X v1 = v; // first row of v
 					v1.val.array.rows = 1;
 					XOPER<X> match = Excel(xlfMatch, i[0], v1, XOPER<X>(0)); // exact
-					ensure(match.is_num());
+					if (!match.is_num()) return match;
 					const XOPER<X>& vi = v(1, (unsigned)match.val.num - 1);
 
 					return i.size() == 1 ? vi : index(vi, i.drop(1));
 				}
 			}
 			else {
-				return XOPER<X>(XOPER<X>::Err::NA);
+				return XErrNA<X>;
 			}
 		}
 
-		ensure(i == 0);
+		if (i != 0 or i[0] != 0) return XErrNA<X>;
 
 		return v;
 	}
+
+} // xll::json
+
+namespace xll::json::parse {
 
 	// forward declaration
 	template<class X, class T>
@@ -77,7 +101,6 @@ namespace xll::parse::json {
 		XOPER<X> x;
 
 		auto o = skip<T>(v, '{', '}', '\\');
-		ensure(!v.skipws());
 
 		while (o.skipws()) {
 			// key : val , ...
@@ -88,7 +111,7 @@ namespace xll::parse::json {
 			// keys are in first row
 			x.push_back(kv, XOPER<X>::Side::Right);
 		}
-		
+
 		return x;
 	}
 
@@ -113,7 +136,7 @@ namespace xll::parse::json {
 	inline XOPER<X> value(fms::view<const T> v)
 	{
 		v.skipws();
-		
+
 		if (v.front() == '{') {
 			return object<X>(v);
 		}
@@ -124,47 +147,46 @@ namespace xll::parse::json {
 			return string<X>(v);
 		}
 
-		// more decode tests!!!
-		XOPER<X> val = decode<X,T>(v);
-		static XOPER<X> xnull("null");
-		static XOPER<X> null(XOPER<X>::Err::Null);
+		XOPER<X> val = decode<X, T>(v);
 
-		return val == xnull ? null : val;
+		return val == "null" ? XErrNull<X> : val;
 	}
-
 
 #ifdef _DEBUG
 
 #define XLL_PARSE_JSON_VALUE(X) \
-	X("null", OPER(OPER::Err::Null)) \
+	X("null", XErrNull<XLOPERX>) \
 	X("\"str\"", "str") \
 	X("\"s\\\"r\"", "s\\\"r") \
 	X("\"s\nr\"", "s\nr") \
 	X("\"s r\"", "s r") \
-	X("[\"a\", 1.23, FALSE]", OPER({OPER("a"), OPER(1.23), OPER(false)})) \
-	X("{\"key\":\"value\"}", OPER({OPER("key"), OPER("value")}).resize(2,1)) \
-	X("{\"key\":\"value\",\"num\":1.23}", OPER({OPER("key"), OPER("num"), OPER("value"), OPER(1.23)}).resize(2,2)) \
-	X(" { \"key\" : \"value\" , \"num\" : 1.23 }", OPER({OPER("key"), OPER("num"), OPER("value"), OPER(1.23)}).resize(2,2)) \
-	X("\r{ \"key\" \t\n: \r\"value\"\r ,\n\t \"num\" : 1.23  }", OPER({OPER("key"), OPER("num"), OPER("value"), OPER(1.23)}).resize(2,2)) \
-	X("{\"a\":{\"b\":\"ab\"}}", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(2,1)}).resize(2,1)) \
-	X(" { \"a\":\n{\"b\":\r\n\t\"ab\" } }", OPER({OPER("a"), OPER({OPER("b"), OPER("ab")}).resize(2,1)}).resize(2,1)) \
-
-	template<class X>
+	X("[\"a\", 1.23, FALSE]", json::array("a", 1.23, false)) \
+	X("{\"key\":\"value\"}", json::object("key", "value")) \
+	X("{\"key\":\"value\",\"num\":1.23}", json::object("key", "num", "value", 1.23)) \
+	X(" { \"key\" : \"value\" , \"num\" : 1.23 }", json::object("key", "num", "value", 1.23)) \
+	X("\r{ \"key\" \t\n: \r\"value\"\r ,\n\t \"num\" : 1.23  }", json::object("key", "num", "value", 1.23)) \
+	X("{\"a\":{\"b\":\"ab\"}}", json::object("a", json::object("b", "ab"))) \
+	X(" { \"a\":\n{\"b\":\r\n\t\"ab\" } }", json::object("a", json::object("b", "ab"))) \
+	
+	//	X("[{\"a\":1},false,null]", json::array(json::object("a", 1), false, XErrNull<XLOPERX>)) \
+	//	X("null", OPER::Err::Null) \
+	//	X("[{\"a\":1},false,null]", json::array(json::object("a", 1), false, OPER::Err::Null)) \
+		
 	inline int test()
 	{
-#define PARSE_JSON_CHECK(a, b) { ensure(value<X>(fms::view(_T(a))) == b); }
+
+#define PARSE_JSON_CHECK(a, b) { ensure(parse::value<XLOPERX>(fms::view(_T(a))) == b); }
 		XLL_PARSE_JSON_VALUE(PARSE_JSON_CHECK)
 #undef PARSE_JSON_CHECK
 
-		OPER x = object<XLOPERX>(fms::view(_T("{\"a\":{\"b\":\"cd\"}}")));
+		OPER x = parse::object<XLOPERX>(fms::view(_T("{\"a\":{\"b\":\"cd\"}}")));
 		OPER i({ OPER("a"), OPER("b") });
-		ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2,1));
 		ensure(json::index(x, i) == "cd");
+		ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2, 1));
 
 		return 0;
 	}
 #undef XLL_PARSE_JSON_VALUE
 #endif // _DEBUG
 
-}
-
+} // namespace json::parse

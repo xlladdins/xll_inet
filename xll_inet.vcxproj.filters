@@ -21,7 +21,7 @@
     <ClInclude Include="fms_ntp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="xll_parse_csv.h">
+    <ClInclude Include="xll_csv.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="libxml2.h">
@@ -33,7 +33,7 @@
     <ClInclude Include="xll_parse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="xll_parse_json.h">
+    <ClInclude Include="xll_json.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

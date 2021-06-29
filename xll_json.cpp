@@ -1,4 +1,4 @@
-#include "xll_parse_json.h"
+#include "xll_json.h"
 
 using namespace fms;
 using namespace xll;
@@ -35,13 +35,13 @@ HANDLEX WINAPI xll_parse_json(LPOPER pjson)
 			ensure(h_);
 			auto v = fms::view<const char>(h_->buf, h_->len);
 			// convert from char to wchar if needed
-			handle<OPER> j_(new OPER(xll::parse::json::value<XLOPERX, char>(v)));
+			handle<OPER> j_(new OPER(json::parse::value<XLOPERX, char>(v)));
 
 			h = h_.get();
 		}
 		else {
 			ensure(pjson->is_str());
-			handle<OPER> h_(new OPER(xll::parse::json::value<XLOPERX>(fms::view<const TCHAR>(pjson->val.str + 1, pjson->val.str[0]))));
+			handle<OPER> h_(new OPER(json::parse::value<XLOPERX>(fms::view<const TCHAR>(pjson->val.str + 1, pjson->val.str[0]))));
 
 			h = h_.get();
 		}
@@ -130,7 +130,7 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 			pjson = h_.ptr();
 		}
 
-		o = parse::json::index(*pjson, *pindex);
+		o = json::index(*pjson, *pindex);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -143,6 +143,6 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 
 #ifdef _DEBUG
 
-Auto<OpenAfter> aoa_test_parse_json([]() { return parse::json::test<XLOPERX>(); });
+Auto<OpenAfter> aoa_test_parse_json([]() { return xll::json::parse::test(); });
 
 #endif // _DEBUG

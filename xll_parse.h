@@ -2,7 +2,7 @@
 #pragma once
 #include "xll/xll/fms_view.h"
 
-namespace xll::parse {
+namespace xll {
 
 	// skip matching left and right chars ignoring escaped
 	// "{data}..." returns escaped "data" an updates fms::view to "..."
@@ -225,7 +225,7 @@ namespace xll::parse {
 	{
 		{
 			fms::view v(_T("ab\ncd"));
-			xll::parse::iterator i(v, _T('\n'), 0, 0, _T('\\'));
+			xll::iterator i(v, _T('\n'), 0, 0, _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(fms::view(_T("ab"))));
 			++b;
@@ -237,7 +237,7 @@ namespace xll::parse {
 		{
 			fms::view v(_T("a\naa\naaa"));
 			fms::view a(_T("aaa"));
-			xll::parse::iterator is(v, _T('\n'), 0, 0, _T('\\'));
+			xll::iterator is(v, _T('\n'), 0, 0, _T('\\'));
 			DWORD n = 1;
 			for (const auto& i : is) {
 				ensure(i.equal(fms::view(a.buf, n)));
@@ -246,7 +246,7 @@ namespace xll::parse {
 		}
 		{
 			fms::view v(_T("\"ab\"\ncd"));
-			xll::parse::iterator i(v, _T('\n'), 0, 0, _T('\\'));
+			xll::iterator i(v, _T('\n'), 0, 0, _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(fms::view(_T("\"ab\""))));
 			++b;
@@ -274,4 +274,4 @@ namespace xll::parse {
 
 #endif // _DEBUG
 
-} // xll::parse
+} // xll
