@@ -20,25 +20,32 @@ namespace xll::csv {
 		return decode<X, T>(field);
 	}
 
-	/*
-	template<class T>
-	using line = chop<T, '\n', '\"', '\"', '\"'>;
-	template<class T>
-	using row = chop<T, ',', '\"', '\"', '\"'>;
-	*/
-
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> parse(const T* buf, DWORD len, T rs, T fs, T e)
+	inline XOPER<X> parse(const T* buf, DWORD len, T rs, T fs, T e, unsigned off = 0, unsigned count = 0)
 	{
 		XOPER<X> o;
 		
 		for (const auto& r : iterator<T>(fms::view<const T>(buf, len), rs, 0, 0, e)) {
 			OPER row;
+
+			if (off != 0) {
+				--off;
+
+				continue;
+			}
+
 			for (const auto& f : iterator<T>(r, fs, 0, 0, e)) {
 				row.push_back(field<X,T>(f));
 			}
 			row.resize(1, row.size());
 			o.push_back(row);
+
+			if (count != 0) {
+				--count;
+				if (count == 0) {
+					break;
+				}
+			}
 		}
 		
 		return o;
