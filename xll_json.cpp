@@ -41,7 +41,7 @@ HANDLEX WINAPI xll_parse_json(LPOPER pjson)
 		}
 		else {
 			ensure(pjson->is_str());
-			handle<OPER> h_(new OPER(json::parse::value<XLOPERX>(fms::view<const TCHAR>(pjson->val.str + 1, pjson->val.str[0]))));
+			handle<OPER> h_(new OPER(json::parse::view<XLOPERX>(fms::view<const TCHAR>(pjson->val.str + 1, pjson->val.str[0]))));
 
 			h = h_.get();
 		}
