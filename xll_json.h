@@ -6,15 +6,18 @@
 #include "xll_parse.h"
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
-JSON objects map neatly to two row <code>OPER</code>s: the keys are in the first row and the values are in the second.
-Keys are strings (<code>xltypeStr</code>) and values are objects, arrays, strings, numbers (<code>xltypeNum</code),
-<code>true</code> or <code>false</code> (<code>xltypeBool</code>), or <code>null</code> (<code>xltypeNil</code>).
+The function <code>JSON.PARSE(string)</code> parses the JSON <code>string</code> into an <code>OPER</code>.
+JSON objects map neatly to <code>OPER</code>s having two rows: 
+the keys are in the first row and the values are in the second.
+Keys are strings (<code>xltypeStr</code>) and values are objects, arrays, 
+strings (<code>xltypeStr</code>, numbers (<code>xltypeNum</code),
+<code>true</code> or <code>false</code> (<code>xltypeBool</code>),
+or <code>null</code> (<code>#NULL!</code>).
 Objects are zero or more key-value pairs of the form <code>{ "key" : value, ... }</code>
 and correspond to multis (<code>xltypeMulti</code>) having 2 rows.
 Arrays are zero or more values of the form <code>[ value, ... ]</code>
-and correspond to multis having 1 rows.
+and correspond to multis having 1 row.
 <p>
-The function <code>JSON.PARSE(string)</code> parses the JSON <code>string</code> into a multi.
 Multis are recursive but Excel cannot display multis that contain other multis.
 Use <code>\RANGE(range)</code> to create an in-memory copy of the parsed string and
 call <code>JSON.INDEX(handle, index)</code> to retreive values. The index is an array
@@ -47,47 +50,35 @@ namespace xll::json {
 		return OPER("\"") & Excel(xlfSubstitute, s, OPER("\""), OPER("\\\"")) & OPER("\"");
 	}
 
-	// lookup 1-base index of i in v
+	// lookup 0-based index of i in v
 	template<class X>
-	inline XOPER<X> match(XOPER<X> i, const XOPER<X>& v)
+	inline unsigned match(const XOPER<X>& v, const XOPER<X>& i)
 	{
-		XOPER<X> m = XErrNA<X>;
+		unsigned vi = (unsigned)-1;
 
-		if (i.is_num()
-			and i.val.num == std::trunc(i.val.num)
-			and 0 <= i.val.num
-			and i.val.num < v.columns()) {
-				m = i.val.num + 1;
+		if (i.is_num()) {
+			vi = static_cast<unsigned>(i.val.num);
 		}
 		else if (i.is_str()) {
 			X v1 = v; // first row of v
 			v1.val.array.rows = 1;
-			m = Excel(xlfMatch, i[0], v1, XOPER<X>(0)); // exact
+			XOPER<X> vi0 = Excel(xlfMatch, i, v1, XOPER<X>(0)); // exact
+			if (vi0.is_num()) {
+				vi = static_cast<unsigned>(vi0.val.num - 1); // 0-based
+			}
 		}
 
-		return m;
+		return vi;
 	}
 		
 	// multi-level index into JSON value
 	template<class X>
-	inline XOPER<X> index(const XOPER<X>& v, XOPER<X> i)
+	inline const XOPER<X>& index(const XOPER<X>& v, XOPER<X> i)
 	{
-		XOPER<X> vi = XErrNA<X>;
+		auto vi0 = match(v, i[0]);
+		ensure(vi0 != (unsigned)-1);
 
-		if (v.is_multi()) {
-			if (v.rows() == 1 and i[0].is_num()) { // 0-based array
-				vi = v[(unsigned)i[0].val.num];
-			}
-			else if (v.rows() == 2) { // object
-				auto vi0 = match(i[0], v);
-				vi = Excel(xlfIndex, v, XOPER<X>(2), vi0);
-			}
-		}
-		else if (i == 0 or i[0] == 0) { // scalar
-			vi = v;
-		}
-
-		return i.size() == 1 ? vi : index(vi, i.drop(1));
+		return i.size() == 1 ? v(1, vi0) : index(v(1, vi0), i.drop(1));
 	}
 
 	// append contents of w to v.
@@ -150,7 +141,7 @@ namespace xll::json::parse {
 			and v.buf[2] == 'l'
 			and v.buf[3] == 'l') {
 				v.advance(4);
-				return XNil<X>;
+				return XErrNull<X>;
 		}
 
 		return XErrNA<X>;
@@ -273,7 +264,7 @@ namespace xll::json::parse {
 
 
 #define XLL_PARSE_JSON_VALUE(X) \
-	X("null", XNil<XLOPERX>) \
+	X("null", XErrNull<XLOPERX>) \
 	X("\"str\"", "str") \
 	X("\"s\\\"r\"", "s\\\"r") \
 	X("\"s\nr\"", "s\nr") \
@@ -340,7 +331,7 @@ namespace xll::json::parse {
 			ensure(!f);
 
 			fms::view n(_T("null"));
-			ensure(is_null<XLOPERX>(n) == Nil);
+			ensure(is_null<XLOPERX>(n) == ErrNull);
 			ensure(!n);
 
 			{
@@ -363,7 +354,7 @@ namespace xll::json::parse {
 			ensure(!str);
 		}
 		{
-			ensure(parse::view<XLOPERX>(fms::view(_T("null"))) == Nil);
+			ensure(parse::view<XLOPERX>(fms::view(_T("null"))) == ErrNull);
 		}
 
 #define PARSE_JSON_CHECK(a, b) { ensure(parse::view<XLOPERX>(fms::view(_T(a))) == b); }
