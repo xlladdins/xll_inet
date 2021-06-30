@@ -1,8 +1,7 @@
 // xll_json.h - JSON to and from OPER
 #pragma once
-#include <charconv>
+#include <iosfwd>
 #include "xll/xll/xll.h"
-//#include "xll/xll/xll_codec.h"
 #include "xll_parse.h"
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
@@ -26,6 +25,43 @@ wildcards then all values with matching keys are returned.
 )xyzyx";
 
 namespace xll::json {
+
+	enum class TYPE {
+		Null = xltypeErr, // and val.err = xlerrNull 
+		Number = xltypeNum,
+		String = xltypeStr,
+		Boolean = xltypeBool,
+		Array = xltypeMulti,
+		Object = xltypeMulti|xlbitXLFree,
+		Unknown
+	};
+
+	template<class X>
+	inline TYPE type(const XOPER<X>& x)
+	{
+		if (x.is_multi()) {
+			if (x.rows() == 1) {
+				return TYPE::Array;
+			}
+			else if (x.rows() == 2) {
+				return TYPE::Object;
+			}
+		}
+		else if (x.is_num()) {
+			return TYPE::Number;
+		}
+		else if (x.is_str()) {
+			return TYPE::String;
+		}
+		else if (x.is_bool()) {
+			return TYPE::Boolean;
+		}
+		else if (x.is_err() and x.val.err == xlerrNull) {
+			return TYPE::Null;
+		}
+
+		return TYPE::Unknown;
+	}
 
 	// JSON construction
 	// [ v, ... ]
@@ -92,8 +128,134 @@ namespace xll::json {
 		return v;
 	}
 
+	template<class X, class T>
+	inline std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const xll::XOPER<X>& x)
+	{
+		switch (type(x)) {
+		case TYPE::Array:
+			os << '[';
+			for (unsigned i = 0; i < x.size(); ++i) {
+				if (i)
+					os << ',';
+				os << x[i];
+			}
+			os << ']';
+
+			break;
+		case TYPE::Object:
+			os << '{';
+			for (unsigned i = 0; i < x.columns(); ++i) {
+				if (i)
+					os << ',';
+				os << x(0, i) << ':' << x(1, i);
+			}
+			os << '}';
+
+			break;
+		case TYPE::Null:
+			os << 'n' << 'u' << 'l' << 'l';
+
+			break;
+		case TYPE::Boolean:
+			if (x.val.xbool)
+				os << 't' << 'r' << 'u' << 'e';
+			else
+				os << 'f' << 'a' << 'l' << 's' << 'e';
+
+			break;
+		case TYPE::Number:
+			os << x.val.num;
+
+			break;
+		case TYPE::String:
+			os << '"';
+			for (T i = 1; i <= x.val.str[0]; ++i) {
+				if (x.val.str[i] == '"')
+					os << '\\';
+				os << x.val.str[i];
+			}
+			os << '"';
+
+			break;
+		default:
+			os << '?';
+		}
+
+		return os;
+	}
+
+	template<class X, class T>
+	inline std::basic_string<T> to_string(const xll::XOPER<X>& x)
+	{
+		std::basic_ostringstream<T> oss;
+
+		oss << x;
+
+		return oss.str();
+	}
+
+
+
+#ifdef _DEBUG
+#include <sstream>
+	
+	inline int test()
+	{
+		{
+			auto o = json::array("a", 1, true);
+			ensure(o.rows() == 1);
+			ensure(o.columns() == 3);
+			ensure(o[0] == "a");
+			ensure(o[1] == 1);
+			ensure(o[2] == true);
+			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			ensure(s == _T("[\"a\",1,true]"));
+		}
+		{
+			auto o = json::object("a", 1);
+			ensure(o.rows() == 2);
+			ensure(o.columns() == 1);
+			ensure(o[0] == "a");
+			ensure(o[1] == 1);
+			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			ensure(s == _T("{\"a\":1}"));
+		}
+		{
+			auto o = json::string(OPER("a\"b"));
+			ensure(o.is_str());
+			ensure(o == "\"a\\\"b\"");
+		}
+		{
+			auto o = json::object("a", "b",
+				                  json::object("b", 2), 1.23);
+			ensure(o.rows() == 2);
+			ensure(o.columns() == 2);
+			auto i = json::array("a", "b");
+ 			ensure(index(o, i[0]) == json::object("b", 2));
+			ensure(index(o, i[1]) == 1.23);
+			ensure(index(o, i) == 2);
+			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			ensure(s == _T("{\"a\":{\"b\":2},\"b\":1.23}"));
+		}
+		{
+			auto o = json::object("a", "b",
+				                  json::object("b", OPER::Err::Null), true);
+			auto v = json::object("a", json::object("b", OPER::Err::Null));
+			auto w = json::object("b", true);
+			v = concat(v, w);
+			ensure(v == o);
+			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			ensure(s == _T("{\"a\":{\"b\":null},\"b\":true}"));
+		}
+
+		return 0;
+	}
+
+#endif // _DEBUG
 
 } // xll::json
+
+
 
 namespace xll::json::parse {
 
@@ -188,8 +350,9 @@ namespace xll::json::parse {
 	{
 		XOPER<X> x;
 
+		v.skipws();
 		v.eat('{');
-		while (v.skipws() and v.front() != '}') {
+		while (v.skipws()) {
 			auto key = string<X,T>(v);
 			v.skipws();
 			v.eat(':');
@@ -198,8 +361,11 @@ namespace xll::json::parse {
 			if (v.front() == ',') {
 				v.eat(',');
 			}
+			else {
+				v.eat('}');
+				break;
+			}
 		}
-		v.eat('}');
 
 		return x;
 	}
@@ -217,8 +383,11 @@ namespace xll::json::parse {
 			if (v.front() == ',') {
 				v.eat(',');
 			}
+			else {
+				v.eat(']');
+				break;
+			}
 		}
-		v.eat(']');
 
 		x.resize(1, x.size());
 
@@ -250,13 +419,15 @@ namespace xll::json::parse {
 		ensure(val != XErrNA<X>);
 
 		return val;
-
 	}
 
 	template<class X, class T = typename traits<X>::xchar>
 	inline XOPER<X> view(fms::view<const T> v)
 	{
-		return parse::value<X, T>(v);
+		XOPER<X> x = parse::value<X, T>(v);
+		ensure(!v.skipws());
+
+		return x;
 	}
 
 
@@ -283,44 +454,10 @@ namespace xll::json::parse {
 		
 	inline int test()
 	{
-		{
-			auto o = json::array("a", 1, true);
-			ensure(o.rows() == 1);
-			ensure(o.columns() == 3);
-			ensure(o[0] == "a");
-			ensure(o[1] == 1);
-			ensure(o[2] == true);
-		}
-		{
-			auto o = json::object("a", 1);
-			ensure(o.rows() == 2);
-			ensure(o.columns() == 1);
-			ensure(o[0] == "a");
-			ensure(o[1] == 1);
-		}
-		{
-			auto o = json::string(OPER("a\"b"));
-			ensure(o.is_str());
-			ensure(o == "\"a\\\"b\"");
-		}
-		{
-			auto o = json::object("a", "b", 
-				                  json::object("b", 2), 1.23);
-			ensure(o.rows() == 2);
-			ensure(o.columns() == 2);
-			auto i = json::array("a", "b");
-			ensure(index(o, i[0]) == json::object("b", 2));
-			ensure(index(o, i[1]) == 1.23);
-			ensure(index(o, i) == 2);
-		}
-		{
-			auto o = json::object("a", "b",
-				json::object("b", 2), 1.23);
-			auto v = json::object("a", json::object("b", 2));
-			auto w = json::object("b", 1.23);
-			v = concat(v, w);
-			ensure(v == o);
-		}
+#define PARSE_JSON_CHECK(a, b) { ensure(parse::view<XLOPERX>(fms::view(_T(a))) == b); }
+		XLL_PARSE_JSON_VALUE(PARSE_JSON_CHECK)
+#undef PARSE_JSON_CHECK
+
 		{
 			fms::view t(_T("true"));
 			ensure(is_true<XLOPERX>(t) == true);
@@ -354,18 +491,15 @@ namespace xll::json::parse {
 			ensure(!str);
 		}
 		{
-			ensure(parse::view<XLOPERX>(fms::view(_T("null"))) == ErrNull);
+			OPER x;
+			x = parse::view<XLOPERX>(fms::view(_T("{\"a\":{\"b\":\"cd\"}}")));
+			OPER i({ OPER("a"), OPER("b") });
+			ensure(json::index(x, i) == "cd");
+			ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2, 1));
 		}
+		{
 
-#define PARSE_JSON_CHECK(a, b) { ensure(parse::view<XLOPERX>(fms::view(_T(a))) == b); }
-		XLL_PARSE_JSON_VALUE(PARSE_JSON_CHECK)
-#undef PARSE_JSON_CHECK
-
-		OPER x;
-		x = parse::view<XLOPERX>(fms::view(_T("{\"a\":{\"b\":\"cd\"}}")));
-		OPER i({ OPER("a"), OPER("b") });
-		ensure(json::index(x, i) == "cd");
-		ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2, 1));
+		}
 
 		// https://www.wikidata.org/w/api.php?action=wbgetentities&sites=enwiki&titles=Berlin&props=descriptions&languages=en&format=json
 		const char wd[] = "{\"entities\":"
@@ -374,7 +508,8 @@ namespace xll::json::parse {
 					"{\"en\":{\"language\":\"en\",\"value\":\"federal state, capitaland largest city of Germany\"}}"
 			    "}"
 			"},\"success\":1}";
-		x = parse::view<XLOPERX,char>(fms::view<const char>(wd));
+		OPER x;
+		x = parse::view<XLOPERX, char>(fms::view<const char>(wd));
 
 		return 0;
 	}

@@ -35,7 +35,7 @@ namespace xll::csv {
 			}
 
 			for (const auto& f : iterator<T>(r, fs, 0, 0, e)) {
-				row.push_back(field<X,T>(f));
+				row.push_back(XOPER<X>(f.buf, static_cast<T>(f.len)));
 			}
 			row.resize(1, row.size());
 			o.push_back(row);
