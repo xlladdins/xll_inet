@@ -118,7 +118,7 @@ AddIn xai_inet_file(
     .Arguments({
         Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.READ."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
-        Arg(XLL_LONG, "_length", "is the number of characters to return. Default is all.")
+        Arg(XLL_LONG, "_count", "is the number of characters to return. Default is all.")
         })
     .FunctionHelp("Return substring of file.")
     .Category(CATEGORY)
@@ -140,6 +140,37 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
         }
 
         result = OPER(h_->buf + off, len);
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        result = ErrNA;
+    }
+
+    return &result;
+}
+
+AddIn xai_view_len(
+    Function(XLL_LPOPER, "xll_view_len", "VIEW.LEN")
+    .Arguments({
+        Arg(XLL_HANDLEX, "handle", "is a handle to a view of memory."),
+        })
+    .FunctionHelp("Return the number of characters in a view.")
+    .Category(CATEGORY)
+    .Documentation(R"xyzyx(
+The function <code>\INET.READ</code> returns a view.
+)xyzyx")
+);
+LPOPER WINAPI xll_view_len(HANDLEX h)
+{
+#pragma XLLEXPORT
+    static OPER result;
+
+    try {
+        handle<fms::view<char>> h_(h);
+        ensure(h_ || !"VIEW.LEN: unrecognized handle");
+
+        result = h_->len;
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());

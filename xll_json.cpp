@@ -133,26 +133,37 @@ LPOPER WINAPI xll_json_stringify(LPOPER pjson)
 	return &o;
 }
 
-//!!! fix this, it is complicated and wrong !!!
-// all subkeys of object matching pattern seperated by "."
-inline OPER match_keys(const OPER& v, const OPER& pattern, const OPER& prefix = OPER("."))
+// match * and ? wildcards
+static inline bool glob(const XLOPERX& o, const XLOPERX& pat)
 {
-	OPER o;
+	// phony up a 1x1 multi
+	static XLOPERX x = { 
+		.val = {.array = {.rows = 1, .columns = 1}},
+		.xltype = xltypeMulti
+	};
+	static XLOPERX zero = { .val = {.num = 0}, .xltype = xltypeNum };
 
+	x.val.array.lparray = const_cast<XLOPERX*>(&o);
+
+	return Excel(xlfMatch, pat, x, zero).is_num();
+}
+
+//!!! fix this, it is complicated and wrong !!!
+// all subkeys of object matching pattern separated by "."
+inline OPER match_keys(const OPER& v, const OPER& pat, OPER& o)
+{
 	ensure(json::type(v) == json::TYPE::Object);
+	OPER dot(".");
 
-	// phony up a 1x1 multi for xlfMatch
-	XLOPERX v1;
-	v1.xltype = xltypeMulti;
-	v1.val.array.rows = 1;
-	v1.val.array.columns = 1;
+	OPER pre;
+	if (auto n = o.size()) {
+		pre = o[n - 1];
+	}
 	for (unsigned i = 0; i < v.columns(); ++i) {
-		v1.val.array.lparray = v.val.array.lparray + i;
-		if (OPER m = Excel(xlfMatch, pattern, v1, OPER(0))) {
-			unsigned vi = static_cast<unsigned>(m.val.num - 1);
-			o.push_back(prefix & v(0, vi));
-			if (json::type(v(1, vi)) == json::TYPE::Object) {
-				o.push_back(match_keys(v(1, vi), pattern, prefix & v(0, vi) & OPER(".")));
+		if (glob(v(0, i), pat)) {
+			o.push_back(pre & dot & v(0, i));
+			if (json::type(v(1, i)) == json::TYPE::Object) {
+				match_keys(v(1, i), pat, o);
 			}
 		}
 	}
@@ -193,7 +204,8 @@ LPOPER WINAPI xll_json_keys(LPOPER pjson, LPOPER pkeys)
 			pjson = h_.ptr();
 		}
 
-		o = match_keys(*pjson, *pkeys, OPER("."));
+		o = OPER{};
+		o = match_keys(*pjson, *pkeys, o);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -231,7 +243,7 @@ inline OPER from_index(const OPER& is)
 }
 
 AddIn xai_json_index(
-	Function(XLL_LPOPER, "xll_json_index", "JSON.INDEX")
+	Function(XLL_LPOPER, "xll_json_index", "JSON.VALUE")
 	.Arguments({
 		Arg(XLL_LPOPER, "object", "is a JSON object or handle."),
 		Arg(XLL_LPOPER, "key", "is the key to lookup."),

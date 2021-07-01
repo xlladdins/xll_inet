@@ -206,6 +206,7 @@
     <ClCompile Include="xll_inet.cpp" />
     <ClCompile Include="xll_json.cpp" />
     <ClCompile Include="xll_xml.cpp" />
+    <ClCompile Include="xll_xpath.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="xll\xll.vcxproj">
