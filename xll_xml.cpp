@@ -388,7 +388,8 @@ LPOPER WINAPI xll_xml_node_children(HANDLEX node)
 		xmlNode* pnode = safe_pointer<xmlNode>(node);
 
 		if (pnode) {
-			o = xll_xml_node_next(safe_handle<xmlNode>(pnode), 0, 0);
+			auto child = xmlFirstElementChild(pnode);
+			o = *xll_xml_node_next(safe_handle<xmlNode>(child), 0, 0);
 		}
 		else {
 			o = ErrNA;
