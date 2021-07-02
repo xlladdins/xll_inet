@@ -30,12 +30,17 @@ INTERNET_FLAG(X)
 #undef INTERNET_FLAGS_TOPIC
 #undef X
 
+//#define XLL_STR(s) XLOPER{ .val = { .w = _countof(s)}, .xltype = xltypeStr}
+
 // convert two columns range into "key: value\r\n ..."
 inline OPER headers(const OPER& o)
 {
+    static OPER sc(": ");
+    static OPER rn("\r\n");
+
     OPER h;
 
-    if (o.is_missing()) {
+    if (o.is_missing() or o.is_nil()) {
         h = "";
     }
     else if (o.is_str()) {
@@ -43,15 +48,13 @@ inline OPER headers(const OPER& o)
     }
     else if (o.is_multi()){
         ensure(o.columns() == 2);
-        OPER sc(": ");
-        OPER rn("\r\n");
         for (unsigned i = 0; i < o.rows(); ++i) {
             h &= o(i, 0) & sc & o(i, 1) & rn;
         }
         h &= rn;
     }
     else {
-        ensure(!"xll::headers: must be missing, string, or two column range");
+        ensure(!"xll::headers: must be missing, nil, string, or two column range");
         h = ErrNA;
     }
 
@@ -67,7 +70,7 @@ Functions for retrieving and parsing URLs.
 #endif // _DEBUG
 
 AddIn xai_inet_read_file(
-    Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.READ")
+    Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.VIEW")
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
@@ -116,14 +119,14 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 AddIn xai_inet_file(
     Function(XLL_LPOPER, "xll_inet_file", "VIEW")
     .Arguments({
-        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.READ."),
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.VIEW."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
         Arg(XLL_LONG, "_count", "is the number of characters to return. Default is all.")
         })
     .FunctionHelp("Return substring of file.")
     .Category(CATEGORY)
     .Documentation(R"xyzyx(
-Get characters returned by <code>\INET.READ</code>.
+Get characters returned by <code>\INET.VIEW</code>.
 )xyzyx")
 );
 LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
@@ -133,7 +136,14 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
 
     try {
         handle<fms::view<char>> h_(h);
-        ensure(h_ || !"INET.VEW: unrecognized handle");
+        ensure(h_ || !"VIEW: unrecognized handle");
+
+        ensure(h_->len > 0);
+        if (h_->buf[0] == 0xEF) {
+            ensure(h_->len > 2);
+            ensure(h_->buf[1] == 0xBB and h_->buf[2] == 0xBF || !"VIEW: does not start with UTF-8 BOM");
+            h_->advance(3);
+        }
 
         if (len == 0 or len > static_cast<LONG>(h_->len) - off) {
             len = h_->len - off;
