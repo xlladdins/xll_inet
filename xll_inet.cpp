@@ -114,7 +114,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 }
 
 AddIn xai_inet_file(
-    Function(XLL_LPOPER, "xll_inet_file", "INET.VIEW")
+    Function(XLL_LPOPER, "xll_inet_file", "VIEW")
     .Arguments({
         Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.READ."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
