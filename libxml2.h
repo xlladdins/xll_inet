@@ -9,6 +9,53 @@
 #include <libxml/HTMLtree.h>
 #include <libxml/xpath.h>
 
+#define XML_NODE_TYPE_ENUM(X) \
+	X(XML_ELEMENT_NODE, ELEMENT) \
+	X(XML_ATTRIBUTE_NODE, ATTRIBUTE) \
+	X(XML_TEXT_NODE, TEXT) \
+	X(XML_CDATA_SECTION_NODE, CDATA) \
+	X(XML_ENTITY_REF_NODE, ENTITY_REF) \
+	X(XML_ENTITY_NODE, ENTITY) \
+	X(XML_PI_NODE, PI) \
+	X(XML_COMMENT_NODE, COMMENT) \
+	X(XML_DOCUMENT_NODE, DOCUMENT) \
+	X(XML_DOCUMENT_TYPE_NODE, DOCUMENT_TYPE) \
+	X(XML_DOCUMENT_FRAG_NODE, DOCUMENT_FRAG) \
+	X(XML_NOTATION_NODE, NOTATION) \
+	X(XML_HTML_DOCUMENT_NODE, HTML_DOCUMENT) \
+	X(XML_DTD_NODE, DTD) \
+	X(XML_ELEMENT_DECL, ELEMENT_DECL) \
+	X(XML_ATTRIBUTE_DECL, ATTRIBUTE_DECL) \
+	X(XML_ENTITY_DECL, ENTITY_DECL) \
+	X(XML_NAMESPACE_DECL, NAMESPACE_DECL) \
+	X(XML_XINCLUDE_START, XINCLUDE_START) \
+	X(XML_XINCLUDE_END, XINCLUDE_END) \
+
+#define XML_PARSER_OPTION_ENUM(X) \
+	X(XML_PARSE_RECOVER, "recover on errors") \
+	X(XML_PARSE_NOENT, "substitute entities") \
+	X(XML_PARSE_DTDLOAD, "load the external subset") \
+	X(XML_PARSE_DTDATTR, "default DTD attributes") \
+	X(XML_PARSE_DTDVALID, "validate with the DTD") \
+	X(XML_PARSE_NOERROR, "suppress error reports") \
+	X(XML_PARSE_NOWARNING, "suppress warning reports") \
+	X(XML_PARSE_PEDANTIC, "pedantic error reporting") \
+	X(XML_PARSE_NOBLANKS, "remove blank nodes") \
+	X(XML_PARSE_SAX1, "use the SAX1 interface internally") \
+	X(XML_PARSE_XINCLUDE, "Implement XInclude substitution ") \
+	X(XML_PARSE_NONET, "Forbid network access") \
+	X(XML_PARSE_NODICT, "Do not reuse the context dictionary") \
+	X(XML_PARSE_NSCLEAN, "remove redundant namespaces declarations") \
+	X(XML_PARSE_NOCDATA, "merge CDATA as text nodes") \
+	X(XML_PARSE_NOXINCNODE, "do not generate XINCLUDE STARTnodes") \
+	X(XML_PARSE_COMPACT, "compact small text no") \
+	X(XML_PARSE_OLD10, "parse using XML-1.0 before update 5") \
+	X(XML_PARSE_NOBASEFIX, "do not fixup XINCLUDE xml:base uris") \
+	X(XML_PARSE_HUGE, "relax any hardcoded limit from the parser") \
+	X(XML_PARSE_OLDSAX, "parse using SAX2 interface before 2.7.0") \
+	X(XML_PARSE_IGNORE_ENC, "ignore internal document encoding hint") \
+	X(XML_PARSE_BIG_LINES, "Store big lines numbers in text PSVI field") \
+
 // Send errors to Excel alert pop-ups
 extern "C" void xmlErrorHandler(void* userData, xmlErrorPtr error);
 
@@ -46,7 +93,60 @@ namespace xml {
 		}
 	};
 
-	namespace node {
+	class node {
+		xmlNodePtr pnode;
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = xmlNodePtr;
+
+		node(xmlNodePtr pnode = nullptr)
+			: pnode(pnode)
+		{ }
+
+		explicit operator bool() const
+		{
+			return pnode != nullptr;
+		}
+		auto operator<=>(const node&) const = default;
+		
+		xmlNodePtr operator*()
+		{
+			return pnode;
+		}
+		xmlNodePtr ptr() const
+		{
+			return pnode;
+		}
+
+		auto begin() const
+		{
+			return *this;
+		}
+		auto end() const
+		{
+			return node(nullptr);
+		}
+
+		node& operator++()
+		{
+			if (pnode)
+				pnode = pnode->next;
+
+			return *this;
+		}
+		node& operator--()
+		{
+			if (pnode)
+				pnode = pnode->prev;
+
+			return *this;
+		}
+
+		const char* name() const
+		{
+			return (const char*)pnode->name;
+		}
+
 		class content {
 			xmlChar* pcontent;
 		public:
