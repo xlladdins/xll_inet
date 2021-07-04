@@ -300,6 +300,26 @@ LPOPER WINAPI xll_xml_node_next(HANDLEX pnode, LPOPER ptype)
 	return &o;
 }
 
+AddIn xai_xml_node_next_element(
+	Function(XLL_LPOPER, "xll_xml_node_next_element", "XML.NODE.NEXT.ELEMENT")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return the next XML node element.")
+	.Documentation(R"(
+This function is
+equivalent to <code>XML.NODE.NEXT(node, XML_ELEMENT_NODE())</code>.
+)")
+);
+LPOPER WINAPI xll_xml_node_next_element(HANDLEX pnode)
+{
+#pragma XLLEXPORT
+	OPER element(XML_ELEMENT_NODE);
+
+	return xll_xml_node_next(pnode, &element);
+}
+
 AddIn xai_xml_node_prev(
 	Function(XLL_LPOPER, "xll_xml_node_prev", "XML.NODE.PREV")
 	.Arguments({
