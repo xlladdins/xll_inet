@@ -146,6 +146,10 @@ namespace xml {
 		{
 			return (const char*)pnode->name;
 		}
+		xmlElementType type() const
+		{
+			return pnode->type;
+		}
 
 		class content {
 			xmlChar* pcontent;
