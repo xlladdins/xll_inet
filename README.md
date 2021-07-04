@@ -21,18 +21,36 @@ To build you should install `libxml2` using [vcpkg](https://vcpkg.io/en/).
 This is what [`FILTERXML`](https://support.microsoft.com/en-us/office/filterxml-function-4df72efc-11ec-4951-86f5-c1374812f5b7)
 wants to be when it grows up.
 
-`\XML.DOCUMENT` parses the data returned by `\INET.READ`. Use `XML.DOCUMENT.ROOT`
-to get the XML root node. Given any XML node, `XML.NODE.NODES(node)` returns a pointer
-to  `node` and all following nodes, if any. Use `XML.NODE.CHILDREN(node)` to get pointers
-to all children of `node`. There are `XML.NODE.*` functions for the node type, name,
-full document path, and content.
+A XML _document_ is an ordered tree of _nodes_.
+Every XML document has a _root_ node.
+All nodes except the root node have a unique _parent_ node.
+Nodes having the same parent are _siblings_ and are the _children_ of the parent.
+The node ordering is the _document order_.
+
+Nodes have a _type_, _name_, _path_, and _content_.
+The most common node types are _element_, _attribute_, and _text_.
+Element nodes have the form `<name attribute*>content</name>` where
+attribute has the form `key="value"` and `*` indicates zero or
+more occurences. Elements with no content can be
+abbreviated as `<name attribute* />`
+The path is the node name and list of
+parents names to the root.
+
+`\XML.DOCUMENT` and `\HTML.DOCUMENT` parse the data returned by `\INET.VIEW`.
+Use `XML.DOCUMENT.ROOT` to get the root node for either type of document.
+In addition to `XML.TYPE`, `XML.NAME`, `XML.PATH`, and `XML.CONTENT`,
+the function `XML.NEXT(node, type)` finds the first following `node`
+of the given `type`. If `type` is missing the next node is returned.
+The function `XML.CHILD(node, type)` finds the first child of node
+with `type`.
+
+`ALL(f, x, args...)` returns an array `{f(x, args), f(f(x, args), args), ...}`.
 
 ## XPath
 
-`\XPATH.QUERY(doc, query)` executes a XPath query on a document.
-Use `XPATH.QUERY.NODES` to get pointers to all nodes returned by the query, if any.
+`XPATH.QUERY(doc, query)` returns all nodes of `doc` matching `query`.
 A simple way to get a full picture of the result of a URL query is to
-call `\INET.READ(url)`, `\XML.DOCUMENT(read)`, `XPATH.QUERY(doc, "//*")`,
+call `\INET.VIEW(url)`, `\XML.DOCUMENT(view)`, `XPATH.QUERY(document, "//*")`,
 then call `XML.NODE.*` functions to get types, names, paths, and content.
 
 ## Remarks
