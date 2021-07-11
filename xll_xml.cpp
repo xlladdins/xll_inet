@@ -332,26 +332,39 @@ AddIn xai_xml_node_next(
 	Function(XLL_LPOPER, "xll_xml_node_next", "XML.NODE.NEXT")
 	.Arguments({
 		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
-//		Arg(XLL_LONG, "_offset", "is an optional offset from the current node. Default is 0."),
-//		Arg(XLL_LONG, "_count", "is an optional number of following siblings to return. Default is all."),
+		Arg(XLL_LPOPER, "_type", "is an optional node type to find. Default is any."),
 		})
 	.Category(CATEGORY)
-	.FunctionHelp("Return following sibling of a XML node.")
+	.FunctionHelp("Return the next XML node of a given type.")
 	.Documentation(R"(
-//Return handles to at most <code>_count</code> following siblings of <code>node</code> 
-//starting from <code>_offset</code>.
+If <code>_type</code> is missing the next node is returned.
+The function <code>XML.NODE.NEXT.ELEMENT(node)</code> is
+equivalent to <code>XML.NODE.NEXT(node, XML_ELEMENT_NODE())</code>
+This is the usual way to walk the document tree.
 )")
 );
-LPOPER WINAPI xll_xml_node_next(HANDLEX pnode)
+LPOPER WINAPI xll_xml_node_next(HANDLEX pnode, LPOPER ptype)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
 	try {
+		o = ErrNA;
+
+		xmlElementType type = static_cast<xmlElementType>(0);
+		if (ptype->is_num()) {
+			type = static_cast<xmlElementType>(ptype->val.num);
+		}
+
 		auto node = xml::node(safe_pointer<xmlNode>(pnode));
 
-		o = ErrNA;
-		++node;
+		if (node) {
+			++node;
+			while (node and type and node.type() != type) {
+				++node;
+			}
+		}
+
 		if (node) {
 			o = safe_handle<xmlNode>(node.ptr());
 		}
@@ -361,6 +374,26 @@ LPOPER WINAPI xll_xml_node_next(HANDLEX pnode)
 	}
 
 	return &o;
+}
+
+AddIn xai_xml_node_next_element(
+	Function(XLL_LPOPER, "xll_xml_node_next_element", "XML.NODE.NEXT.ELEMENT")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return the next XML node element.")
+	.Documentation(R"(
+This function is
+equivalent to <code>XML.NODE.NEXT(node, XML_ELEMENT_NODE())</code>.
+)")
+);
+LPOPER WINAPI xll_xml_node_next_element(HANDLEX pnode)
+{
+#pragma XLLEXPORT
+	OPER element(XML_ELEMENT_NODE);
+
+	return xll_xml_node_next(pnode, &element);
 }
 
 AddIn xai_xml_node_prev(
@@ -555,32 +588,8 @@ notation, HTML document, document type definition, ...
 LPOPER WINAPI xll_xml_node_type(HANDLEX node)
 {
 #pragma XLLEXPORT
-	// Assumes default enum numbering
-	static OPER ElementType[] = {
-		OPER("UNKNOWN"),
-		OPER("ELEMENT"),
-		OPER("ATTRIBUTE"),
-		OPER("TEXT"),
-		OPER("CDATA_SECTION"),
-		OPER("ENTITY_REF"),
-		OPER("ENTITY"),
-		OPER("PI"),
-		OPER("COMMENT"),
-		OPER("DOCUMENT"),
-		OPER("DOCUMENT_TYPE"),
-		OPER("DOCUMENT_FRAG"),
-		OPER("NOTATION"),
-		OPER("HTML_DOCUMENT"),
-		OPER("DTD"),
-		OPER("ELEMENT_DECL"),
-		OPER("ATTRIBUTE_DECL"),
-		OPER("ENTITY_DECL"),
-		OPER("NAMESPACE_DECL"),
-		OPER("XINCLUDE_START"),
-		OPER("XINCLUDE_END"),
-	};
-
 	static OPER o;
+	
 	o = ErrNA;
 	auto pnode = safe_pointer<xmlNode>(node);
 	if (pnode) {
@@ -589,8 +598,10 @@ LPOPER WINAPI xll_xml_node_type(HANDLEX node)
 #define XLL_NODE_TYPE_VALUE(a, b) else if (pnode->type == a) { o = #b; }
 		XML_NODE_TYPE_ENUM(XLL_NODE_TYPE_VALUE)
 #undef XLL_NODE_TYPE_VALUE
+		else {
+			o = "UNKNOWN";
+		}
 	}
-
 
 	return &o;
 }
