@@ -142,6 +142,11 @@ namespace xml {
 			return *this;
 		}
 
+		xmlElementType type() const
+		{
+			return pnode->type;
+		}
+
 		const char* name() const
 		{
 			return (const char*)pnode->name;
