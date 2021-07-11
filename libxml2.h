@@ -146,24 +146,40 @@ namespace xml {
 		{
 			return (const char*)pnode->name;
 		}
-
-		class content {
-			xmlChar* pcontent;
+		// temporary strings
+		class string {
+			xmlChar* str;
 		public:
-			content(xmlNodePtr pnode)
-				: pcontent(xmlNodeGetContent(pnode))
+			string(xmlChar* str)
+				: str(str)
 			{ }
-			content(const content&) = delete;
-			content& operator=(const content&) = delete;
-			~content()
+			string(const string&) = delete;
+			string& operator=(const string&) = delete;
+			~string()
 			{
-				xmlFree(pcontent);
+				xmlFree(str);
 			}
 			const char* ptr() const
 			{
-				return (const char*)pcontent;
+				return (const char*)str;
+			}
+			operator const char* () const
+			{
+				return (const char*)str;
 			}
 		};
+		const node::string content() const
+		{
+			return node::string(xmlNodeGetContent(pnode));
+		}
+		const node::string path() const
+		{
+			return node::string(xmlGetNodePath(pnode));
+		}
+		const node::string list(int inLine = 1) const
+		{
+			return node::string(xmlNodeListGetString(pnode->doc, pnode, inLine));
+		}
 	};
 
 } // namespace xml

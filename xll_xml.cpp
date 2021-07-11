@@ -185,6 +185,50 @@ LPOPER WINAPI xll_xml_document_root(HANDLEX doc)
 	return &o;
 }
 
+AddIn xai_xml_node_attribues(
+	Function(XLL_LPOPER, "xll_xml_node_attributes", "XML.NODE.ATTRIBUTES")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a pointer to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return attributes of an element node.")
+	.Documentation(R"(
+Content of the node or <code>#N/A</code> if none.
+)")
+);
+LPOPER WINAPI xll_xml_node_attributes(HANDLEX pnode)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = ErrNA;
+
+		xmlNodePtr node = safe_pointer<xmlNode>(pnode);
+		ensure(node);
+		ensure(node->type == XML_ELEMENT_NODE);
+
+		if (node) {
+			o = OPER{};
+			OPER v;
+			xmlAttrPtr cur = node->properties;
+			while (cur and cur->name and cur->children) {
+				o.push_back(OPER((const char*)cur->name));
+				v.push_back(OPER(xml::node(cur->children).content()));
+				cur = cur->next;
+			}
+			o.resize(1, o.size());
+			v.resize(1, v.size());
+			o.push_back(v/*, OPER::Side::Bottom*/);
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
 AddIn xai_xml_node_content(
 	Function(XLL_LPOPER, "xll_xml_node_content", "XML.NODE.CONTENT")
 	.Arguments({
@@ -202,11 +246,43 @@ LPOPER WINAPI xll_xml_node_content(HANDLEX pnode)
 	static OPER o;
 
 	try {
-		xmlNodePtr node = safe_pointer<xmlNode>(pnode);
+		auto node = xml::node(safe_pointer<xmlNode>(pnode));
 
 		if (node) {
-			auto content = xml::node::content(node);
-			o = content.ptr();
+			o = node.content();
+		}
+		else {
+			o = ErrNA;
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_xml_node_list(
+	Function(XLL_LPOPER, "xll_xml_node_list", "XML.NODE.LIST")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a pointer to a XML node."),
+		})
+		.Category(CATEGORY)
+	.FunctionHelp("Return list string of a node.")
+	.Documentation(R"(
+List string of the node or <code>#N/A</code> if none.
+)")
+);
+LPOPER WINAPI xll_xml_node_list(HANDLEX pnode)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		auto node = xml::node(safe_pointer<xmlNode>(pnode));
+
+		if (node) {
+			o = node.list();
 		}
 		else {
 			o = ErrNA;
@@ -328,7 +404,7 @@ AddIn xai_xml_node_children(
 		.Category(CATEGORY)
 	.FunctionHelp("Return children of a node.")
 	.Documentation(R"(
-Return handles to all children of <code>node</code>.
+Return handles to all children of <code>node</code> that are element nodes.
 )")
 );
 LPOPER WINAPI xll_xml_node_children(HANDLEX pnode)
@@ -337,15 +413,15 @@ LPOPER WINAPI xll_xml_node_children(HANDLEX pnode)
 	static OPER o;
 
 	try {
-		auto node = xml::node(safe_pointer<xmlNode>(pnode));
-
 		o = ErrNA;
-		if (node) {
-			auto child = xml::node(xmlFirstElementChild(node.ptr()));
-			o = OPER{};
-			while (child) {
-				o.push_back(OPER(safe_handle<xmlNode>(child.ptr())));
-				++child;
+
+		xmlNodePtr node = safe_pointer<xmlNode>(pnode);
+		ensure(node);
+
+		o = OPER{};
+		for (auto child = node->children; child; child = child->next) {
+			if (child->type == XML_ELEMENT_NODE) {
+				o.push_back(OPER(safe_handle<xmlNode>(child)));
 			}
 		}
 	}
@@ -356,6 +432,43 @@ LPOPER WINAPI xll_xml_node_children(HANDLEX pnode)
 	return &o;
 }
 
+AddIn xai_xml_node_siblings(
+	Function(XLL_LPOPER, "xll_xml_node_siblings", "XML.NODE.SIBLINGS")
+	.Arguments({
+		Arg(XLL_HANDLEX, "node", "is a handle to a XML node."),
+		//		Arg(XLL_LONG, "_axis", "is an optional axis direction. Default is 0."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return following sibling of a XML node.")
+	.Documentation(R"(
+//Return handles to at most <code>_count</code> following siblings of <code>node</code> 
+//starting from <code>_offset</code>.
+)")
+);
+LPOPER WINAPI xll_xml_node_siblings(HANDLEX pnode)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		o = ErrNA;
+
+		xmlNodePtr node = safe_pointer<xmlNode>(pnode);
+		ensure(node);
+
+		o = OPER{};
+		for (auto cur = node->parent->children; cur; cur = cur->next) {
+			if (cur->type == XML_ELEMENT_NODE) {
+				o.push_back(OPER(safe_handle<xmlNode>(cur)));
+			}
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
 /*
 AddIn xai_xml_node_attributes(
 	Function(XLL_LPOPER, "xll_xml_node_attributes", "XML.NODE.ATTRIBUTES")
@@ -403,16 +516,16 @@ AddIn xai_xml_node_path(
 Full path to node in XML document.
 )")
 );
-LPOPER WINAPI xll_xml_node_path(HANDLEX node)
+LPOPER WINAPI xll_xml_node_path(HANDLEX pnode)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
 	try {
-		auto pnode = safe_pointer<xmlNode>(node);
+		auto node = xml::node(safe_pointer<xmlNode>(pnode));
 
-		if (pnode) {
-			o = (char*)xmlGetNodePath(pnode);
+		if (node) {
+			o = node.path();
 		}
 		else {
 			o = ErrNA;

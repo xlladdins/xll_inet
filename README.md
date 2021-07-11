@@ -11,21 +11,29 @@ to all the characters returned from the URL. It uses
 [`InternetOpenUrl`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
 , [`InternetReadFile`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile)
 , and a memory mapped file to buffer data to memory.
-The returned handle is a view of the characters. 
-Use `INET.VIEW(read, offset, count)` to access this data.
 
-## XML
 
-This library uses [libxml2](http://xmlsoft.org/downloads.html) for XML/HTML parsing and XPath.
-To build you should install `libxml2` using [vcpkg](https://vcpkg.io/en/).
+## HTML/XML
+
+This library uses [libxml2](http://xmlsoft.org/downloads.html) for HTML/XML parsing and XPath.
+Install `libxml2` using [vcpkg](https://vcpkg.io/en/).
 This is what [`FILTERXML`](https://support.microsoft.com/en-us/office/filterxml-function-4df72efc-11ec-4951-86f5-c1374812f5b7)
 wants to be when it grows up.
 
+The function `\INET.VIEW(url)` reads `url` and returns a view of the characters returned.
+Use `VIEW(view, offset, length)` to return the characters in `view`. The default value
+of `offset` is 0 and if length is not specified then all charaters from the offset
+are returned. The first dozen or so characters let you identify what type of
+document was returned.
+
+Call `\HTML.DOCUMENT(view)` to get a handle to an HTML document containing
+the parsed `view`. 
+The function `\XML.DOCUMENT(view)` is also provided for parsing XML documents.
 A XML _document_ is an ordered tree of _nodes_.
 Every XML document has a _root_ node.
 All nodes except the root node have a unique _parent_ node.
 Nodes having the same parent are _siblings_ and are the _children_ of the parent.
-The node ordering is the _document order_.
+The node ordering is called the _document order_.
 
 Nodes have a _type_, _name_, _path_, and _content_.
 The most common node types are _element_, _attribute_, and _text_.
@@ -36,13 +44,20 @@ abbreviated as `<name attribute* />`
 The path is the node name and list of
 parents names to the root.
 
-`\XML.DOCUMENT` and `\HTML.DOCUMENT` parse the data returned by `\INET.VIEW`.
-Use `XML.DOCUMENT.ROOT` to get the root node for either type of document.
-In addition to `XML.TYPE`, `XML.NAME`, `XML.PATH`, and `XML.CONTENT`,
-the function `XML.NEXT(node, type)` finds the first following `node`
+Use `XML.DOCUMENT.ROOT(doc)` to get the root node for either type of document.
+In addition to `XML.NODE.TYPE`, `XML.NODE.NAME`, `XML.NODE.PATH`, and `XML.NODE.CONTENT`,
+the function `XML.NODE.ATTRIBUTES(node)` will return a two row range of
+all node attributes with keys in the first row and values in the second.
+The functions `XML.NODE.NEXT(node, type)` and `XML.NODE.PREV(node, type)`
+find the first sibling node following or preceding `node`
 of the given `type`. If `type` is missing the next node is returned.
-The function `XML.CHILD(node, type)` finds the first child of node
-with `type`.
+The function `XML.NODE.CHILD(node, type)` finds the first child of node
+with `type` and `XML.NODE.PARENT(node)` returns the unique parent of `node`. 
+Node types are defined in the `XML_*_NODE()` enumeration.
+These functions can be used to (tediously) traverse a document node-by-node.
+The functions `XML.NODE.SIBLINGS(node)` and `XML.NODE.CHILDREN(node)`
+return handles to all sibling and children nodes that have type `XML_NODE_ELEMENT()`.
+Element nodes are usually what you want when traversing a document.
 
 `ALL(f, x, args...)` returns an array `{f(x, args), f(f(x, args), args), ...}`.
 
