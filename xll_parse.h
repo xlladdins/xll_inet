@@ -19,10 +19,59 @@
 	X(xltypeDate, DATE, "is a datetime") \
 	X(xltypeTime, TIME, "is a time") \
 
-namespace xll {
+namespace xll::parse {
 
-	
-	inline void convert(OPER& o, const OPER& type)
+	template<class T>
+	inline double to_number(fms::view<T>& v);
+
+	// test for numbers
+	template<>
+	inline double to_number<char>(fms::view<char>& v)
+	{
+		char* end;
+		double num = strtod(v.buf, &end);
+		if (end == v.buf) 
+			return std::numeric_limits<double>::quiet_NaN();
+		v.drop(static_cast<int32_t>(end - v.buf));
+
+		return num;
+	}
+	template<>
+	inline double to_number<const char>(fms::view<const char>& v)
+	{
+		char* end;
+		double num = strtod(v.buf, &end);
+		if (end == v.buf)
+			return std::numeric_limits<double>::quiet_NaN();
+		v.drop(static_cast<int32_t>(end - v.buf));
+
+		return num;
+	}
+	template<>
+	inline double to_number<wchar_t>(fms::view<wchar_t>& v)
+	{
+		wchar_t* end;
+		double num = wcstod(v.buf, &end);
+		if (end == v.buf)
+			return std::numeric_limits<double>::quiet_NaN();
+		v.drop(static_cast<int32_t>(end - v.buf));
+
+		return num;
+	}
+	template<>
+	inline double to_number<const wchar_t>(fms::view<const wchar_t>& v)
+	{
+		wchar_t* end;
+		double num = wcstod(v.buf, &end);
+		if (end == v.buf)
+			return std::numeric_limits<double>::quiet_NaN();
+		v.drop(static_cast<int32_t>(end - v.buf));
+
+		return num;
+	}
+
+	template<class X>
+	inline void convert(XOPER<X>& o, const XOPER<X>& type)
 	{
 		ensure(type.is_nil() or type.is_num());
 
@@ -30,6 +79,7 @@ namespace xll {
 			o = Excel(xlfEvaluate, o);
 			if (type == xltypeBool and !o.is_bool()) {
 				o = !!o;
+				ensure(o.is_bool());
 			}
 		}
 		else if (type == xltypeDate) {
@@ -41,9 +91,9 @@ namespace xll {
 	}
 
 	// skip matching left and right chars ignoring escaped
-	// "{data}..." returns escaped "data" an updates fms::view to "..."
+	// "{da\}ta}..." returns escaped "da\}ta" an updates fms::view to "..."
 	template<class T>
-	inline fms::view<const T> skip(fms::view<const T>& v, T l, T r, T e)
+	inline fms::view<T> skip(fms::view<T>& v, T l, T r, T e)
 	{
 		// delimiters can't be used as escape
 		ensure(l != e and r != e);
@@ -71,9 +121,8 @@ namespace xll {
 
 		ensure(level == 0);
 
-		auto data = fms::view<const T>(v.buf, n - 1);
-		v.buf += n;
-		v.len -= n;
+		auto data = fms::view<T>(v.buf, n - 1);
+		v.drop(n);
 
 		return data;
 	}
@@ -109,7 +158,7 @@ namespace xll {
 
 	// find index of unescaped separator
 	template<class T>
-	inline DWORD find(fms::view<const T>& v, T s, T l, T r, T e)
+	inline DWORD find(const fms::view<T>& v, T s, T l, T r, T e)
 	{
 		DWORD n = 0;
 
@@ -122,7 +171,7 @@ namespace xll {
 			}
 			if (v.buf[n] == l) {
 				auto vn = fms::view(v.buf + n, static_cast<DWORD>(v.len - n));
-				n += skip(vn, l, r, e).len + 2; // count l and r
+				n += skip<T>(vn, l, r, e).len + 2; // count l and r
 			}
 			else {
 				++n;
@@ -134,12 +183,11 @@ namespace xll {
 		
 	// next chunk up to separator and advance view 
 	template<class T>
-	inline fms::view<const T> chop(fms::view<const T>& v, T s, T l, T r, T e)
+	inline fms::view<T> chop(fms::view<T>& v, T s, T l, T r, T e)
 	{
 		DWORD n = find(v, s, l, r, e);
-		auto data = fms::view<const T>(v.buf, n);
-		v.buf += n;
-		v.len -= n;
+		auto data = fms::view<T>(v.buf, n);
+		v.drop(n);
 		if (v) {
 			v.eat(s);
 		}
@@ -201,17 +249,17 @@ namespace xll {
 	// view iterator
 	template<class T>
 	class iterator {
-		fms::view<const T> v;
+		fms::view<T> v;
 		T s, l, r, e;
 		DWORD n;
 	public:
 		using iterator_category = std::forward_iterator_tag;
-		using value_type = fms::view<const T>;
+		using value_type = fms::view<T>;
 		iterator()
 			: s(0), l(0), r(0), e(0), n(0)
 		{ }
-		iterator(const fms::view<const T>& _v, T s, T l, T r, T e)
-			: v(_v), s(s), l(l), r(r), e(e), n(find(v, s, l, r, e))
+		iterator(const fms::view<T>& _v, T s, T l, T r, T e)
+			: v(_v), s(s), l(l), r(r), e(e), n(find<T>(v, s, l, r, e))
 		{ }
 		~iterator()
 		{ }
@@ -224,21 +272,20 @@ namespace xll {
 		}
 		auto end() const
 		{
-			return iterator(fms::view<const T>(v.buf + v.len, 0), s, l, r, e);
+			return iterator(fms::view<T>(v.buf + v.len, 0), s, l, r, e);
 		}
 		value_type operator*() const
 		{
-			return fms::view<const T>(v.buf, n);
+			return fms::view<T>(v.buf, n);
 		}
 		iterator& operator++()
 		{
 			if (v) {
-				v.buf += n;
-				v.len -= n;
+				v.drop(n);
 				if (v) {
 					v.eat(s);
 				}
-				n = find(v, s, l, r, e); // n = chop().len
+				n = find<T>(v, s, l, r, e); // n = chop().len
 			}
 
 			return *this;
@@ -261,7 +308,7 @@ namespace xll {
 	{
 		{
 			fms::view v(_T("ab\ncd"));
-			xll::iterator i(v, _T('\n'), 0, 0, _T('\\'));
+			parse::iterator i(v, _T('\n'), 0, 0, _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(fms::view(_T("ab"))));
 			++b;
@@ -273,7 +320,7 @@ namespace xll {
 		{
 			fms::view v(_T("a\naa\naaa"));
 			fms::view a(_T("aaa"));
-			xll::iterator is(v, _T('\n'), 0, 0, _T('\\'));
+			parse::iterator is(v, _T('\n'), 0, 0, _T('\\'));
 			DWORD n = 1;
 			for (const auto& i : is) {
 				ensure(i.equal(fms::view(a.buf, n)));
@@ -282,7 +329,7 @@ namespace xll {
 		}
 		{
 			fms::view v(_T("\"ab\"\ncd"));
-			xll::iterator i(v, _T('\n'), 0, 0, _T('\\'));
+			parse::iterator i(v, _T('\n'), 0, 0, _T('\\'));
 			auto b = i.begin();
 			ensure((*b).equal(fms::view(_T("\"ab\""))));
 			++b;

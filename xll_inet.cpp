@@ -153,7 +153,7 @@ fms::view<T> drop_take_c(fms::view<T> v, LONG off, int c)
         while (-len < (LONG)v.len and v.buf[v.len + len] != c) {
             --len;
         }
-        v.take(len);
+        v.take(len + 1);
     }
 
     return v;
@@ -231,6 +231,7 @@ Auto<OpenAfter> xaoa_view_test([]() {
             ensure(drop_take_c(v, 0, 'f').equal(v));
             ensure(drop_take_c(v, 0, 'f').equal(v));
 
+            ensure(drop_take_n(v, 5, 0).len == 0);
         }
         {
             fms::view<const char> w("abc");

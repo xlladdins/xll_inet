@@ -131,7 +131,7 @@ LPOPER WINAPI xll_parse_json(LPOPER pjson)
 			handle<fms::view<char>> h_(pjson->val.num);
 			ensure(h_);
 			// convert from char to wchar if needed
-			o = json::parse::view<XLOPERX, char>(fms::view<const char>(h_->buf, h_->len));
+			o = json::parse::view<XLOPERX, char>(fms::view(h_->buf, h_->len));
 		}
 		else {
 			ensure(pjson->is_str());
@@ -270,11 +270,13 @@ LPOPER WINAPI xll_json_keys(LPOPER pjson, LPOPER pkeys)
 inline OPER to_index(const OPER& i)
 {
 	xchar rs = 0;
-	OPER o = csv::parse<XLOPERX>(i.val.str + 1, i.val.str[0], rs, _T('.'), rs).drop(1);
+	auto v = view(i.val.str + 1, i.val.str[0]);
+	OPER o = csv::parse<XLOPERX,xchar>(v, rs, _T('.'), rs).drop(1);
 
 	for (auto& oi : o) {
 		if (oi.val.str[0] and oi.val.str[1] == '[') {
-			oi = json::parse::view<XLOPERX>(fms::view<const TCHAR>(oi.val.str + 1, oi.val.str[0]));
+			auto vi = view(oi.val.str + 1, oi.val.str[0]);
+			oi = json::parse::view<XLOPERX,xchar>(vi);
 		}
 	}
 

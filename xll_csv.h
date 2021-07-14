@@ -22,12 +22,13 @@ namespace xll::csv {
 	}
 	*/
 
-	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> parse(const T* buf, DWORD len, T rs, T fs, T e, unsigned off = 0, unsigned count = 0)
+	// use view!!!
+	template<class X, class T>
+	inline XOPER<X> parse(fms::view<T> buf, T rs, T fs, T e, unsigned off = 0, unsigned count = 0)
 	{
 		XOPER<X> o;
 		
-		for (const auto& r : iterator<T>(fms::view<const T>(buf, len), rs, 0, 0, e)) {
+		for (const auto& r : parse::iterator<T>(buf, rs, 0, 0, e)) {
 			OPER row;
 
 			if (off != 0) {
@@ -36,26 +37,33 @@ namespace xll::csv {
 				continue;
 			}
 
-			for (const auto& f : iterator<T>(r, fs, 0, 0, e)) {
-				row.push_back(XOPER<X>(f.buf, static_cast<T>(f.len)));
+			for (auto f : parse::iterator<T>(r, fs, 0, 0, e)) {
+				double num = parse::to_number<T>(f);
+				if (!isnan(num)) {
+					ensure(!f.skipws());
+					row.push_right(XOPER<X>(num));
+				}
+				else {
+					row.push_right(XOPER<X>(f.buf, static_cast<T>(f.len)));
+				}
 			}
-			row.resize(1, row.size());
+
 			//xlerrNA
 			if (row.size() < o.columns()) {
 				row.resize(1, row.columns()); // pad
 			}
+			/*
 			else if (o and row.size() > o.columns()) {
 				// widen range
 				OPER pad(o.rows(), row.size() - row.columns());
 				o.push_back(pad, OPER::Side::Right);
 			}
-			o.push_back(row);
+			*/
+			o.push_bottom(row);
 
-			if (count != 0) {
-				--count;
-				if (count == 0) {
+			if (count) {
+				if (--count == 0)
 					break;
-				}
 			}
 		}
 		
@@ -68,8 +76,8 @@ namespace xll::csv {
 	inline int test_parse_csv()
 	{
 		{
-			fms::view v(_T("a,b\nc,d"));
-			OPER o = parse<XLOPERX>(v.buf, v.len, _T('\n'), _T(','), _T('\\'));
+			fms::view<const T> v(_T("a,b\nc,d"));
+			OPER o = parse<XLOPERX, const T>(v, _T('\n'), _T(','), _T('\\'));
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			ensure(o(0, 0) == "a");

@@ -268,10 +268,10 @@ namespace xll::json::parse {
 
 	// forward declaration
 	template<class X, class T>
-	XOPER<X> value(fms::view<const T>& v);
+	XOPER<X> value(fms::view<T>& v);
 
 	template<class X, class T>
-	inline XOPER<X> is_true(fms::view<const T>& v)
+	inline XOPER<X> is_true(fms::view<T>& v)
 	{
 		if (v.len >= 4
 			and v.buf[0] == 't'
@@ -282,11 +282,11 @@ namespace xll::json::parse {
 				return XOPER<X>(true);
 		}
 	
-		return XErrNA<X>;
+		return XErrValue<X>;
 	}
 
 	template<class X, class T>
-	inline XOPER<X> is_false(fms::view<const T>& v)
+	inline XOPER<X> is_false(fms::view<T>& v)
 	{
 		if (v.len >= 5
 			and v.buf[0] == 'f'
@@ -298,11 +298,11 @@ namespace xll::json::parse {
 				return XOPER<X>(false);
 		}
 
-		return XErrNA<X>;
+		return XErrValue<X>;
 	}
 
 	template<class X, class T>
-	inline XOPER<X> is_null(fms::view<const T>& v)
+	inline XOPER<X> is_null(fms::view<T>& v)
 	{
 		if (v.len >= 4
 			and v.buf[0] == 'n'
@@ -313,47 +313,29 @@ namespace xll::json::parse {
 				return XErrNull<X>;
 		}
 
-		return XErrNA<X>;
+		return XErrValue<X>;
 	}
 
-	template<class T>
-	struct str { };
-	template<>
-	struct str<char> {
-		static double tod(const char* s, char** e) { return strtod(s, e); }
-	};
-	template<>
-	struct str<wchar_t> {
-		static double tod(const wchar_t* s, wchar_t** e) { return wcstod(s, e); }
-	};
-
 	template<class X, class T>
-	inline XOPER<X> number(fms::view<const T>& v)
+	inline XOPER<X> number(fms::view<T>& v)
 	{
-		XOPER<X> num = XErrNA<X>;
+		double num = xll::parse::to_number<T>(v);
 
-		T* e;
-		double n = str<T>::tod(v.buf, &e);
-		if (v.buf != e) {
-			num = n;
-			v.drop(static_cast<uint32_t>(e - v.buf));
-		}
-		
-		return num;
+		return isnan(num) ? XErrValue<X> : XOPER<X>(num);
 	}
 
 	// "\"str\"" => "str"
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> string(fms::view<const T>& v)
+	inline XOPER<X> string(fms::view<T>& v)
 	{
-		auto str = skip<T>(v, '"', '"', '\\');
+		auto str = xll::parse::skip<T>(v, '"', '"', '\\');
 
 		return XOPER<X>(str.buf, str.len);
 	}
 
 	// object := "{ \"key\" : val , ... } "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> object(fms::view<const T>& v)
+	inline XOPER<X> object(fms::view<T>& v)
 	{
 		XOPER<X> x;
 
@@ -378,7 +360,7 @@ namespace xll::json::parse {
 
 	// array := "[ value , ... ] "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> array(fms::view<const T>& v)
+	inline XOPER<X> array(fms::view<T>& v)
 	{
 		XOPER<X> x;
 
@@ -409,7 +391,7 @@ namespace xll::json::parse {
 	}
 
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> value(fms::view<const T>& v)
+	inline XOPER<X> value(fms::view<T>& v)
 	{
 		v.skipws();
 
@@ -424,19 +406,19 @@ namespace xll::json::parse {
 		}
 
 		
-		if (auto val = is_null<X>(v); val != XErrNA<X>) return val;
-		if (auto val = is_true<X>(v); val != XErrNA<X>) return val;
-		if (auto val = is_false<X>(v); val != XErrNA<X>) return val;
+		if (auto val = is_null<X>(v); val != XErrValue<X>) return val;
+		if (auto val = is_true<X>(v); val != XErrValue<X>) return val;
+		if (auto val = is_false<X>(v); val != XErrValue<X>) return val;
 
 		// last chance
 		XOPER<X> val = number<X>(v);
-		ensure(val != XErrNA<X>);
+		ensure(val != XErrValue<X>);
 
 		return val;
 	}
 
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> view(fms::view<const T> v)
+	inline XOPER<X> view(fms::view<T> v)
 	{
 		XOPER<X> x = parse::value<X, T>(v.skipws());
 		ensure(!v.skipws());
@@ -492,7 +474,7 @@ namespace xll::json::parse {
 			}
 			{
 				fms::view num(_T("foo1.23"));
-				ensure(number<XLOPERX>(num) == ErrNA);
+				ensure(number<XLOPERX>(num) == ErrValue);
 			}
 		}
 		{
@@ -523,7 +505,7 @@ namespace xll::json::parse {
 			    "}"
 			"},\"success\":1}";
 		OPER x;
-		x = parse::view<XLOPERX, char>(fms::view<const char>(wd));
+		x = parse::view<XLOPERX, const char>(fms::view(wd));
 
 		return 0;
 	}

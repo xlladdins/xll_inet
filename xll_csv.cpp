@@ -46,7 +46,8 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 			char fs = static_cast<char>(*_fs ? *_fs : ',');
 			char e = static_cast<char>(*_e ? *_e : '\\');
 
-			o = xll::csv::parse<XLOPERX, char>(h_->buf, h_->len, rs, fs, e, off, count);
+			auto v = fms::view<char>(h_->buf, h_->len);
+			o = xll::csv::parse<XLOPERX,char>(v, rs, fs, e, off, count);
 		}
 		else {
 			ensure(pcsv->is_str());
@@ -55,7 +56,8 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 			xchar fs = *_fs ? *_fs : ',';
 			xchar e = *_e ? *_e : '\\';
 
-			o = xll::csv::parse<XLOPERX>(pcsv->val.str + 1, pcsv->val.str[0], rs, fs, e, off, count);
+			auto v = fms::view<xchar>(pcsv->val.str + 1, pcsv->val.str[0]);
+			o = xll::csv::parse<XLOPERX>(v, rs, fs, e, off, count);
 		}
 	}
 	catch (const std::exception& ex) {
@@ -103,7 +105,7 @@ LPOPER WINAPI xll_range_convert(LPOPER prange, const LPOPER ptypes, BOOL header)
 			const auto& type = (ptypes)[i];
 			if (type) {
 				for (unsigned j = header; j < po->rows(); ++j) {
-					convert((*po)(i, j), type);
+					parse::convert((*po)(i, j), type);
 				}
 			}
 		}
