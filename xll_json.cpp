@@ -26,15 +26,6 @@ LPOPER WINAPI xll_json_type(LPOPER pjson)
 	static OPER o;
 
 	try {
-		o = ErrNA;
-
-		if (pjson->is_num()) {
-			handle<OPER> h_(pjson->val.num);
-			if (h_) {
-				pjson = h_.ptr();
-			}
-		}
-
 		switch(json::type(*pjson)) {
 		case json::TYPE::Object:
 			o = "object";
@@ -46,7 +37,7 @@ LPOPER WINAPI xll_json_type(LPOPER pjson)
 			o = "string";
 			break;
 		case json::TYPE::Number:
-			o = "num";
+			o = "number";
 			break;
 		case json::TYPE::Boolean:
 			o = "boolean";
@@ -55,7 +46,7 @@ LPOPER WINAPI xll_json_type(LPOPER pjson)
 			o = "null";
 			break;
 		default:
-			o = "unknown";
+			o = ErrValue;
 		}
 	}
 	catch (const std::exception& ex) {
@@ -64,6 +55,60 @@ LPOPER WINAPI xll_json_type(LPOPER pjson)
 
 	return &o;
 }
+
+#ifdef _DEBUG
+
+Auto<OpenAfter> xaoa_json_type_test([]() {
+	try {
+		{
+			OPER o = json::object("key", "val");
+			ensure(*xll_json_type(&o) == "object");
+			o = json::object();
+			ensure(*xll_json_type(&o) == "object");
+		}
+		{
+			OPER o = json::array("i0", 1, true);
+			ensure(*xll_json_type(&o) == "array");
+			o = json::array();
+			ensure(*xll_json_type(&o) == "array");
+		}
+		{
+			OPER o = json::string("foo");
+			ensure(*xll_json_type(&o) == "string");
+			o = json::string("");
+			ensure(*xll_json_type(&o) == "string");
+			o = json::string(OPER{});
+			ensure(o == "\"\"");
+			ensure(*xll_json_type(&o) == "string");
+			o = "bar";
+			ensure(*xll_json_type(&o) == "string");
+		}
+		{
+			OPER o(1.23);
+			ensure(*xll_json_type(&o) == "number");
+		}
+		{
+			OPER o(true);
+			ensure(*xll_json_type(&o) == "boolean");
+		}
+		{
+			ensure(*xll_json_type((LPOPER)&ErrNull) == "null");
+		}
+		{
+			OPER o(REF(2, 3));
+			ensure(*xll_json_type(&o) == ErrValue);
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return FALSE;
+	}
+
+	return TRUE;
+});
+
+#endif // _DEBUG
 
 AddIn xai_parse_json(
 	Function(XLL_LPOPER, "xll_parse_json", "JSON.PARSE")
@@ -123,7 +168,7 @@ LPOPER WINAPI xll_json_stringify(LPOPER pjson)
 				pjson = h_.ptr();
 			}
 		}
-		auto str = json::to_string<XLOPERX, TCHAR>(*pjson);
+		auto str = json::stringify<XLOPERX, TCHAR>(*pjson);
 		o = OPER(str.c_str(), static_cast<TCHAR>(str.length()));
 	}
 	catch (const std::exception& ex) {
@@ -148,7 +193,6 @@ static inline bool glob(const XLOPERX& o, const XLOPERX& pat)
 	return Excel(xlfMatch, pat, x, zero).is_num();
 }
 
-//!!! fix this, it is complicated and wrong !!!
 // all subkeys of object matching pattern separated by "."
 inline OPER match_keys(const OPER& v, const OPER& pat, OPER& o)
 {
@@ -161,8 +205,14 @@ inline OPER match_keys(const OPER& v, const OPER& pat, OPER& o)
 	}
 	for (unsigned i = 0; i < v.columns(); ++i) {
 		if (glob(v(0, i), pat)) {
-			o.push_back(pre & dot & v(0, i));
-			if (json::type(v(1, i)) == json::TYPE::Object) {
+			auto type = json::type(v(1, i));
+			if (type == json::TYPE::Object) {
+				o.push_back(pre & dot & v(0, i));
+				match_keys(v(1, i), pat, o);
+			}
+			else if (type == json::TYPE::Array) {
+				// like jq
+				o.push_back(pre & dot & OPER("[") & OPER(i) & OPER("]"));
 				match_keys(v(1, i), pat, o);
 			}
 		}
@@ -220,8 +270,15 @@ LPOPER WINAPI xll_json_keys(LPOPER pjson, LPOPER pkeys)
 inline OPER to_index(const OPER& i)
 {
 	xchar rs = 0;
+	OPER o = csv::parse<XLOPERX>(i.val.str + 1, i.val.str[0], rs, _T('.'), rs).drop(1);
 
-	return csv::parse<XLOPERX>(i.val.str + 1, i.val.str[0], rs, _T('.'), rs).drop(1);
+	for (auto& oi : o) {
+		if (oi.val.str[0] and oi.val.str[1] == '[') {
+			oi = json::parse::view<XLOPERX>(fms::view<const TCHAR>(oi.val.str + 1, oi.val.str[0]));
+		}
+	}
+
+	return o;
 }
 
 // convert array of keys to a jq dotted key
@@ -234,8 +291,15 @@ inline OPER from_index(const OPER& is)
 		index = dot;
 	}
 	else {
-		for (const auto& i : is) {
-			index.append(dot).append(i);
+		for (auto i : is) {
+			if (i.is_multi()) {
+				i.resize(1, i.size());
+				index.append(dot).append(json::stringify<XLOPERX>(i).c_str());
+			}
+			else {
+				ensure(i.is_str());
+				index.append(dot).append(i);
+			}
 		}
 	}
 

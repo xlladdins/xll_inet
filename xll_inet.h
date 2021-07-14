@@ -11,6 +11,8 @@
 #define CATEGORY "Inet"
 #endif
 
+#define USER_AGENT "Mozilla/5.0 (Windows NT) Gecko/20100101 Firefox/89.0"
+
 namespace Inet {
 
 	using HInet = Win::Hnd<HINTERNET, InternetCloseHandle>;

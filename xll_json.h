@@ -70,6 +70,11 @@ namespace xll::json {
 	{
 		return xll::OPER({ xll::OPER(os)... }).resize(1, static_cast<unsigned>(sizeof...(os)));
 	}
+	template<>
+	inline xll::OPER array()
+	{
+		return xll::OPER(1, 1);
+	}
 
 	// { k, ..., v, ...}
 	template<class... Os>
@@ -78,6 +83,11 @@ namespace xll::json {
 		static_assert(0 == sizeof...(os) % 2);
 
 		return array(os...).resize(2, static_cast<unsigned>(sizeof...(os)/2));
+	}
+	template<>
+	inline xll::OPER object()
+	{
+		return xll::OPER(2, 1);
 	}
 
 	// "s" with escaped quotes
@@ -122,7 +132,7 @@ namespace xll::json {
 	inline XOPER<X>& concat(XOPER<X>& v, const XOPER<X>& w)
 	{
 		for (unsigned i = 0; i < w.columns(); ++i) {
-			v.push_back(json::object<X>(w(0,i), w(1,i)), XOPER<X>::Side::Right);
+			v.push_right(json::object<X>(w(0,i), w(1,i)));
 		}
 
 		return v;
@@ -147,6 +157,7 @@ namespace xll::json {
 			for (unsigned i = 0; i < x.columns(); ++i) {
 				if (i)
 					os << ',';
+				ensure(x(0, i).is_str());
 				os << x(0, i) << ':' << x(1, i);
 			}
 			os << '}';
@@ -164,16 +175,12 @@ namespace xll::json {
 
 			break;
 		case TYPE::Number:
-			os << x.val.num;
+			os << /*std::fixed <<*/ x.val.num;
 
 			break;
 		case TYPE::String:
 			os << '"';
-			for (T i = 1; i <= x.val.str[0]; ++i) {
-				if (x.val.str[i] == '"')
-					os << '\\';
-				os << x.val.str[i];
-			}
+			os.write(x.val.str + 1, x.val.str[0]);
 			os << '"';
 
 			break;
@@ -184,8 +191,8 @@ namespace xll::json {
 		return os;
 	}
 
-	template<class X, class T>
-	inline std::basic_string<T> to_string(const xll::XOPER<X>& x)
+	template<class X, class T = traits<X>::xchar>
+	inline std::basic_string<T> stringify(const xll::XOPER<X>& x)
 	{
 		std::basic_ostringstream<T> oss;
 
@@ -208,7 +215,7 @@ namespace xll::json {
 			ensure(o[0] == "a");
 			ensure(o[1] == 1);
 			ensure(o[2] == true);
-			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			auto s = json::stringify<XLOPERX, TCHAR>(o);
 			ensure(s == _T("[\"a\",1,true]"));
 		}
 		{
@@ -217,7 +224,7 @@ namespace xll::json {
 			ensure(o.columns() == 1);
 			ensure(o[0] == "a");
 			ensure(o[1] == 1);
-			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			auto s = json::stringify<XLOPERX, TCHAR>(o);
 			ensure(s == _T("{\"a\":1}"));
 		}
 		{
@@ -234,7 +241,7 @@ namespace xll::json {
  			ensure(index(o, i[0]) == json::object("b", 2));
 			ensure(index(o, i[1]) == 1.23);
 			ensure(index(o, i) == 2);
-			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			auto s = json::stringify<XLOPERX, TCHAR>(o);
 			ensure(s == _T("{\"a\":{\"b\":2},\"b\":1.23}"));
 		}
 		{
@@ -244,7 +251,7 @@ namespace xll::json {
 			auto w = json::object("b", true);
 			v = concat(v, w);
 			ensure(v == o);
-			auto s = json::to_string<XLOPERX, TCHAR>(o);
+			auto s = json::stringify<XLOPERX, TCHAR>(o);
 			ensure(s == _T("{\"a\":{\"b\":null},\"b\":true}"));
 		}
 
@@ -271,7 +278,7 @@ namespace xll::json::parse {
 			and v.buf[1] == 'r'
 			and v.buf[2] == 'u'
 			and v.buf[3] == 'e') {
-				v.advance(4);
+				v.drop(4);
 				return XOPER<X>(true);
 		}
 	
@@ -287,7 +294,7 @@ namespace xll::json::parse {
 			and v.buf[2] == 'l'
 			and v.buf[3] == 's'
 			and v.buf[4] == 'e') {
-				v.advance(5);
+				v.drop(5);
 				return XOPER<X>(false);
 		}
 
@@ -302,7 +309,7 @@ namespace xll::json::parse {
 			and v.buf[1] == 'u'
 			and v.buf[2] == 'l'
 			and v.buf[3] == 'l') {
-				v.advance(4);
+				v.drop(4);
 				return XErrNull<X>;
 		}
 
@@ -329,7 +336,7 @@ namespace xll::json::parse {
 		double n = str<T>::tod(v.buf, &e);
 		if (v.buf != e) {
 			num = n;
-			v.advance(static_cast<uint32_t>(e - v.buf));
+			v.drop(static_cast<uint32_t>(e - v.buf));
 		}
 		
 		return num;
@@ -350,8 +357,7 @@ namespace xll::json::parse {
 	{
 		XOPER<X> x;
 
-		v.skipws();
-		v.eat('{');
+		v.skipws().eat('{');
 		while (v.skipws()) {
 			auto key = string<X,T>(v);
 			v.skipws();
@@ -376,9 +382,17 @@ namespace xll::json::parse {
 	{
 		XOPER<X> x;
 
-		v.eat('[');
+		v.skipws().eat('[');
 		while (v.skipws() and v.front() != ']') {
-			x.push_back(value<X,T>(v));
+			auto val = value<X, T>(v);
+			if (val.is_multi()) {
+				OPER xi(1, 1);
+				xi[0] = val;
+				x.push_right(xi);
+			}
+			else {
+				x.push_right(val);
+			}
 			v.skipws();
 			if (v.front() == ',') {
 				v.eat(',');
@@ -424,7 +438,7 @@ namespace xll::json::parse {
 	template<class X, class T = typename traits<X>::xchar>
 	inline XOPER<X> view(fms::view<const T> v)
 	{
-		XOPER<X> x = parse::value<X, T>(v);
+		XOPER<X> x = parse::value<X, T>(v.skipws());
 		ensure(!v.skipws());
 
 		return x;

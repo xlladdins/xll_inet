@@ -2,7 +2,43 @@
 #pragma once
 #include "xll/xll/fms_view.h"
 
+#define xltypeDate (xltypeNum|xlbitXLFree)
+#define xltypeTime (xltypeNum|xlbitDLLFree)
+
+#define XLTYPE(X) \
+	X(xltypeNum, NUM, "is a 64-bit floating point number") \
+	X(xltypeStr, STR, "is a string") \
+	X(xltypeBool, BOOL, "is a boolean") \
+	X(xltypeRef, REF, "is a multiple reference") \
+	X(xltypeErr, ERR, "is an error") \
+	X(xltypeMulti, MULTI, "is a two dimensional range") \
+	X(xltypeMissing, MISSING, "is missing function argument") \
+	X(xltypeNil, NIL, "is a null type") \
+	X(xltypeSRef, SREF, "is a single reference") \
+	X(xltypeInt, INT, "is an integer") \
+	X(xltypeDate, DATE, "is a datetime") \
+	X(xltypeTime, TIME, "is a time") \
+
 namespace xll {
+
+	
+	inline void convert(OPER& o, const OPER& type)
+	{
+		ensure(type.is_nil() or type.is_num());
+
+		if (type == xltypeNum || type == xltypeBool || type == xltypeInt) {
+			o = Excel(xlfEvaluate, o);
+			if (type == xltypeBool and !o.is_bool()) {
+				o = !!o;
+			}
+		}
+		else if (type == xltypeDate) {
+			o = Excel(xlfDatevalue, o);
+		}
+		else if (type == xltypeTime) {
+			o = Excel(xlfTimevalue, o);
+		}
+	}
 
 	// skip matching left and right chars ignoring escaped
 	// "{data}..." returns escaped "data" an updates fms::view to "..."
@@ -73,7 +109,7 @@ namespace xll {
 
 	// find index of unescaped separator
 	template<class T>
-	inline DWORD find(fms::view<const T>& v, T s, T l, T r,T e)
+	inline DWORD find(fms::view<const T>& v, T s, T l, T r, T e)
 	{
 		DWORD n = 0;
 

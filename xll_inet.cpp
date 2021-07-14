@@ -1,5 +1,6 @@
 // xll_inet.cpp - WinInet wrappers
 #include "xll_inet.h"
+#include "xll_parse.h"
 
 using namespace xll;
 
@@ -35,7 +36,7 @@ INTERNET_FLAG(X)
 // convert two columns range into "key: value\r\n ..."
 inline OPER headers(const OPER& o)
 {
-    static OPER sc(": ");
+    static OPER co(": ");
     static OPER rn("\r\n");
 
     OPER h;
@@ -47,14 +48,14 @@ inline OPER headers(const OPER& o)
         h = o;
     }
     else if (o.is_multi()){
-        ensure(o.columns() == 2);
+        ensure(o.rows() == 2);
         for (unsigned i = 0; i < o.rows(); ++i) {
-            h &= o(i, 0) & sc & o(i, 1) & rn;
+            h &= o(0, i) & co & o(1, i) & rn;
         }
         h &= rn;
     }
     else {
-        ensure(!"xll::headers: must be missing, nil, string, or two column range");
+        ensure(!"xll::headers: must be missing, nil, string, or two row range");
         h = ErrNA;
     }
 
@@ -70,7 +71,7 @@ Functions for retrieving and parsing URLs.
 #endif // _DEBUG
 
 AddIn xai_inet_read_file(
-    Function(XLL_HANDLEX, "xll_inet_read_file", "\\INET.VIEW")
+    Function(XLL_HANDLEX, "xll_inet_read_file", "\\URL.VIEW")
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
@@ -84,6 +85,9 @@ Read all url data into memory using
 <a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla">InternetOpenUrl</a>
 and
 <a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile">InternetReadFile</a>.
+<p>
+Headers are specified as a two row array of keys in the first row and values in the second.
+</p>
 )xyzyx")
 );
 HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
@@ -95,7 +99,8 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
         handle<fms::view<char>> h_(new win::mem_view);
         
         DWORD_PTR context = NULL;
-        OPER head = headers(*pheaders);
+        OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
+        head.append(headers(*pheaders));
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
         ensure(hurl || !"\\INET.READ: failed to open URL")
  
@@ -116,40 +121,87 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     return h;
 }
 
-AddIn xai_inet_file(
-    Function(XLL_LPOPER, "xll_inet_file", "VIEW")
+template<class T>
+fms::view<T> drop_take_n(fms::view<T> v, LONG off, LONG len)
+{
+    v.drop(off);
+
+    if (len == 0) {
+        len = (LONG)v.len;
+    }
+    v.take(len);
+    
+    return v;
+}
+
+template<class T>
+fms::view<T> drop_take_c(fms::view<T> v, LONG off, int c)
+{
+    //v.drop(off);
+
+    if (off >= 0) {
+        LONG len = 0;
+        while (len < (LONG)v.len and v.buf[len] != c) {
+            ++len;
+        }
+        v.take(len);
+    }
+    else if (off < 0) {
+        long len = -1;
+        while (-len < (LONG)v.len and v.buf[v.len + len] != c) {
+            --len;
+        }
+        v.take(len);
+    }
+
+    return v;
+}
+
+AddIn xai_view(
+    Function(XLL_LPOPER, "xll_view", "VIEW")
     .Arguments({
-        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.VIEW."),
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\URL.VIEW."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
-        Arg(XLL_LONG, "_count", "is the number of characters to return. Default is all.")
+        Arg(XLL_LPOPER, "_count", "is the number of characters to return. Default is all.")
         })
-    .FunctionHelp("Return substring of file.")
+    .FunctionHelp("Return substring of view.")
     .Category(CATEGORY)
     .Documentation(R"xyzyx(
-Get characters returned by <code>\INET.VIEW</code>.
+Drop <code>_offset</code> and take <code>_count</code> charaters from a view.
+If <code>_count</code> is a string then the view is truncated at the
+first character of this string if offset is positive. If offset is negative
+the all characters up to the last occurence are taken.
 )xyzyx")
 );
-LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
+LPOPER WINAPI xll_view(HANDLEX h, LONG off, LPOPER plen)
 {
 #pragma XLLEXPORT
     static OPER result;
 
     try {
-        handle<fms::view<char>> h_(h);
-        ensure(h_ || !"VIEW: unrecognized handle");
+        handle<fms::view<char>> v(h);
+        ensure(v || !"VIEW: unrecognized handle");
 
-        ensure(h_->len > 0);
-        if (h_->buf[0] == 0xEF) {
-            ensure(h_->len > 2);
-            ensure(h_->buf[1] == 0xBB and h_->buf[2] == 0xBF || !"VIEW: does not start with UTF-8 BOM");
-            h_->advance(3);
+
+        if (v->len > 3 and v->buf[0] == 0xEF) {
+            ensure(v->buf[1] == 0xBB and v->buf[2] == 0xBF || !"VIEW: does not start with UTF-8 BOM");
+            v->drop(3);
         }
 
-        if (len == 0 or len > static_cast<LONG>(h_->len) - off) {
-            len = h_->len - off;
+        if (off > (LONG)v->len or off < -(LONG)v->len) {
+            result = ErrNA;
         }
+        else if (plen->is_num()) {
+            LONG len = (LONG)plen->val.num;
+            *v = drop_take_n(*v, off, len);
+        }
+        else if (plen->is_str() and plen->val.str[0] > 0) {
+            int c = plen->val.str[1];
+            *v = drop_take_c(*v, off, c);
+        }
+        // else noop
 
-        result = OPER(h_->buf + off, len);
+        result = OPER(v->buf, v->len);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
@@ -159,6 +211,48 @@ LPOPER WINAPI xll_inet_file(HANDLEX h, LONG off, LONG len)
 
     return &result;
 }
+
+#ifdef _DEBUG
+
+Auto<OpenAfter> xaoa_view_test([]() {
+    try {
+        fms::view<const char> v("abcde");
+
+        {
+            ensure(drop_take_n(v, 0, 0).equal(v));
+        }
+        {
+            ensure(drop_take_n(v, 0, 5).equal(v));
+        }
+        {
+            ensure(drop_take_n(v, 0, 6).equal(v));
+        }
+        {
+            ensure(drop_take_n(v, 0, -7).equal(v));
+        }
+        {
+            fms::view<const char> w("abc");
+            ensure(drop_take_n(v, 0, 3).equal(w));
+            ensure(drop_take_c(v, 0, 'd').equal(w));
+        }
+        {
+            fms::view<const char> w("cde");
+            ensure(drop_take_n(v, 2, 3).equal(w));
+            ensure(drop_take_n(v, 2, 0).equal(w));
+            ensure(drop_take_c(v, -1, 'b').equal(w));
+        }
+
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        return FALSE;
+    }
+
+    return TRUE;
+});
+
+#endif // _DEBUG
 
 AddIn xai_view_len(
     Function(XLL_LPOPER, "xll_view_len", "VIEW.LEN")
@@ -189,6 +283,44 @@ LPOPER WINAPI xll_view_len(HANDLEX h)
     }
 
     return &result;
+}
+
+AddIn xai_view_drop(
+    Function(XLL_HANDLEX, "xll_view_drop", "VIEW.DROP")
+    .Arguments({
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\URL.VIEW."),
+        Arg(XLL_LONG, "count", "number or characters to drop from beginning (count > 0) or end (count < 0) of view"),
+        })
+    .FunctionHelp("Return substring of view.")
+    .Category(CATEGORY)
+    .Documentation(R"xyzyx(
+)xyzyx")
+);
+HANDLEX WINAPI xll_view_drop(HANDLEX h, LONG count)
+{
+#pragma XLLEXPORT
+    static OPER result;
+
+    try {
+        handle<fms::view<char>> h_(h);
+        ensure(h_ || !"VIEW: unrecognized handle");
+
+        count = std::clamp(count, -(LONG)h_->len, (LONG)h_->len);
+        if (count > 0) {
+            h_->buf += count;
+            h_->len -= count;
+        }
+        else if (count < 0) {
+            h_->len += count;
+        }
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        h = 0;
+    }
+
+    return h;
 }
 
 #if 0

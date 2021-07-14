@@ -6,7 +6,7 @@ wants be when it grows up.
 
 A limitation of `WEBSERVICE` is that it returns a string. Strings in Excel are
 limited to 32767 = 2<sup>15</sup> - 1 characters. Most web pages are larger
-than that. Much larger. The function `\INET.READ(url)` returns a handle 
+than that. Much larger. The function `\URL.VIEW(url)` returns a handle 
 to all the characters returned from the URL. It uses 
 [`InternetOpenUrl`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
 , [`InternetReadFile`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile)
@@ -20,9 +20,9 @@ Install `libxml2` using [vcpkg](https://vcpkg.io/en/).
 This is what [`FILTERXML`](https://support.microsoft.com/en-us/office/filterxml-function-4df72efc-11ec-4951-86f5-c1374812f5b7)
 wants to be when it grows up.
 
-The function `\INET.VIEW(url)` reads `url` and returns a view of the characters returned.
+The function `\URL.VIEW(url)` reads `url` and returns a view of the characters returned.
 Use `VIEW(view, offset, length)` to return the characters in `view`. The default value
-of `offset` is 0 and if length is not specified then all charaters from the offset
+of `offset` is 0 and if `length` is not specified then all charaters from the offset
 are returned. The first dozen or so characters let you identify what type of
 document was returned.
 
@@ -33,7 +33,7 @@ A XML _document_ is an ordered tree of _nodes_.
 Every XML document has a _root_ node.
 All nodes except the root node have a unique _parent_ node.
 Nodes having the same parent are _siblings_ and are the _children_ of the parent.
-The node ordering is called the _document order_.
+The node ordering is called _document order_.
 
 Nodes have a _type_, _name_, _path_, and _content_.
 The most common node types are _element_, _attribute_, and _text_.
@@ -59,18 +59,51 @@ The functions `XML.NODE.SIBLINGS(node)` and `XML.NODE.CHILDREN(node)`
 return handles to all sibling and children nodes that have type `XML_NODE_ELEMENT()`.
 Element nodes are usually what you want when traversing a document.
 
-`ALL(f, x, args...)` returns an array `{f(x, args), f(f(x, args), args), ...}`.
-
 ## XPath
 
 `XPATH.QUERY(doc, query)` returns all nodes of `doc` matching `query`.
 A simple way to get a full picture of the result of a URL query is to
-call `\INET.VIEW(url)`, `\XML.DOCUMENT(view)`, `XPATH.QUERY(document, "//*")`,
+call `\URL.VIEW(url)`, `\XML.DOCUMENT(view)`, `XPATH.QUERY(document, "//*")`,
 then call `XML.NODE.*` functions to get types, names, paths, and content.
+
+## CSV
+
+Comma separated strings are parsed into 2-dimensional ranges by 
+`CSV.PARSE(view, rs, fs, esc, offset, count)` where `rs` is the record
+separator, `fs` is the field separator, `esc` is the escape character,
+`offset` is the number of initial lines to skip, and `count` is the
+number of rows to return. The default record separator is comma (','),
+field separator is newline ('\n'), and escape character is ('\').
+The default offset is 0 and if count is missing then all lines are
+returned. All range elements are returned as strings.
+
+Use `CSV.CONVERT(range, types, index)` to convert columns specified
+by (0-based) `index` into corresponding `types` from the `TYPE_*` enumeration.
+
+## JSON
+
+JSON strings are parsed using `JSON.PARSE` into values. Objects are
+parsed into two row arrays where the first row contains the keys and
+the second row contains their corresponding values. Arrays are parsed
+into one row ranges. Use `JSON.TYPE(value)` to detect if the value
+is an object, array, string, number, boolean, or null.
+
+The function `JSON.INDEX(value, index)` retrieves values from a JSON `value`.
+If `value` is an object and `index` is a string this is equivalent to `HLOOKUP(index, object, 2, FALSE)`.
+If `value` is an array and `index` is a number this is equivalent to `INDEX(array, index + 1)`.
+The index can be an array of keys and will lookup values recursively.
+The index can also be specifed in dotted [jq](https://stedolan.github.io/jq/) style.
 
 ## Remarks
 
 http://worldtimeapi.org/pages/schema
 http://worldtimeapi.org/api/timezone/Europe/London.txt
+https://www.wikidata.org/wiki/Wikidata:Data_access
+Each item or property has a persistent URI that you obtain by appending its ID (such as Q42 or P31) to the Wikidata concept namespace: http://www.wikidata.org/entity/
+Linked data clients would receive Wikidata's data about the entity in a different format such as JSON or RDF, depending on the HTTP Accept: header of their request. 
+For cases in which it is inconvenient to use content negotiation (e.g. to view non-HTML content in a web browser), you can also access data about an entity in a specific format by extending the data URL with an extension suffix to indicate the content format that you want, such as .json, .rdf, .ttl, .nt or .jsonld
+https://www.w3.org/TR/rdf11-concepts/
+
 https://www.wikidata.org/w/api.php?action=wbgetentities&sites=enwiki&titles=Berlin&props=descriptions&languages=en&format=json
 
+`ALL(f, x, args...)` returns an array `{f(x, args), f(f(x, args), args), ...}`.

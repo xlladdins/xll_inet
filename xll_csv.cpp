@@ -3,6 +3,12 @@
 
 using namespace xll;
 
+#define XLTYPE_TOPIC "https://support.microsoft.com/en-us/office/type-function-45b4e688-4bc3-48b3-a105-ffa892995899"
+#define X(a, b, c) XLL_CONST(LONG, XLTYPE_##b, a, c, "XLL", XLTYPE_TOPIC)
+XLTYPE(X)
+#undef XLTYPE_TOPIC
+#undef X
+
 using xcstr = xll::traits<XLOPERX>::xcstr;
 using xchar = xll::traits<XLOPERX>::xchar;
 
@@ -13,7 +19,7 @@ AddIn xai_csv_parse(
 		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
 		Arg(XLL_CSTRING, "_fs", "is an optional field separator. Default is comma ','."),
 		Arg(XLL_CSTRING, "_esc", "is an optional escape character. Default is backslash '\\'."),
-		Arg(XLL_WORD, "_offset", "is an optional number of lines to skipe. Default is 0."),
+		Arg(XLL_WORD, "_offset", "is an optional number of lines to skip. Default is 0."),
 		Arg(XLL_WORD, "_count", "is an optional number of lines to return. Default is all.")
 		})
 	.FunctionHelp("Parse CSV string into a range.")
@@ -56,6 +62,56 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 		XLL_ERROR(ex.what());
 
 		o = ErrNA;
+	}
+
+	return &o;
+}
+
+AddIn xai_range_convert(
+	Function(XLL_LPOPER, "xll_range_convert", "RANGE.CONVERT")
+	.Arguments({
+		Arg(XLL_LPOPER, "range", "is a range or handle to a range."),
+		Arg(XLL_LPOPER, "types", "is a one row range of conversion types."),
+		Arg(XLL_BOOL, "_header", "is an optional boolean indicating the first row is a header.")
+		})
+	.FunctionHelp("Convert columns of range.")
+	.Category("RANGE")
+	.Documentation(R"(
+Convert columns of <code>range</code> based on index. The <code>types</code>
+should have the same size as the number of columns and contain numbers
+corresponding to <code>xltype*</code> values.
+)")
+);
+LPOPER WINAPI xll_range_convert(LPOPER prange, const LPOPER ptypes, BOOL header)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		LPOPER po = &o;
+		if (prange->is_num()) {
+			handle<OPER> h_(prange->val.num);
+			ensure(h_);
+			po = h_.ptr();
+		}
+		else {
+			o = *prange;
+		}
+		ensure(po->columns() == ptypes->size());
+
+		for (unsigned i = 0; i < po->columns(); ++i) {
+			const auto& type = (ptypes)[i];
+			if (type) {
+				for (unsigned j = header; j < po->rows(); ++j) {
+					convert((*po)(i, j), type);
+				}
+			}
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return (LPOPER)&ErrValue;
 	}
 
 	return &o;

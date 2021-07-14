@@ -96,11 +96,15 @@ namespace xml {
 	class node {
 		xmlNodePtr pnode;
 	public:
-		using iterator_category = std::forward_iterator_tag;
+		using iterator_category = std::bidirectional_iterator_tag;
 		using value_type = xmlNodePtr;
 
 		node(xmlNodePtr pnode = nullptr)
 			: pnode(pnode)
+		{ }
+		node(const node&) = default;
+		node& operator=(const node&) = default;
+		virtual ~node()
 		{ }
 
 		explicit operator bool() const
@@ -134,6 +138,14 @@ namespace xml {
 
 			return *this;
 		}
+		node operator++(int)
+		{
+			auto tmp{ *this };
+
+			operator++();
+
+			return tmp;
+		}
 		node& operator--()
 		{
 			if (pnode)
@@ -141,16 +153,24 @@ namespace xml {
 
 			return *this;
 		}
+		node& operator--(int)
+		{
+			auto tmp{ *this };
+
+			operator--();
+
+			return tmp;
+		}
 
 		xmlElementType type() const
 		{
 			return pnode->type;
 		}
-
 		const char* name() const
 		{
 			return (const char*)pnode->name;
 		}
+
 		// temporary strings
 		class string {
 			xmlChar* str;
@@ -173,6 +193,7 @@ namespace xml {
 				return (const char*)str;
 			}
 		};
+
 		const node::string content() const
 		{
 			return node::string(xmlNodeGetContent(pnode));
