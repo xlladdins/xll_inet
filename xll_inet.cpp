@@ -137,7 +137,9 @@ fms::view<T> drop_take_n(fms::view<T> v, LONG off, LONG len)
 template<class T>
 fms::view<T> drop_take_c(fms::view<T> v, LONG off, int c)
 {
-    //v.drop(off);
+    if (off != -1) {
+        v.drop(off);
+    }
 
     if (off >= 0) {
         LONG len = 0;
@@ -220,15 +222,15 @@ Auto<OpenAfter> xaoa_view_test([]() {
 
         {
             ensure(drop_take_n(v, 0, 0).equal(v));
-        }
-        {
             ensure(drop_take_n(v, 0, 5).equal(v));
-        }
-        {
             ensure(drop_take_n(v, 0, 6).equal(v));
-        }
-        {
             ensure(drop_take_n(v, 0, -7).equal(v));
+
+            ensure(drop_take_c(v, 0, 'f').equal(v));
+            ensure(drop_take_c(v, 0, 'f').equal(v));
+            ensure(drop_take_c(v, 0, 'f').equal(v));
+            ensure(drop_take_c(v, 0, 'f').equal(v));
+
         }
         {
             fms::view<const char> w("abc");
