@@ -12,6 +12,21 @@ XLTYPE(X)
 using xcstr = xll::traits<XLOPERX>::xcstr;
 using xchar = xll::traits<XLOPERX>::xchar;
 
+AddIn xai_xltype(
+	Function(XLL_LONG, "xll_xltype", "XLTYPE")
+	.Arguments({
+		{XLL_LPOPER, "cell", "is a cell."},
+		})
+	.Category("XLL")
+	.FunctionHelp("Returns the type of a cell as a XLTYPE_* enumeration.")
+);
+LONG WINAPI xll_xltype(const LPOPER po)
+{
+#pragma XLLEXPORT
+
+	return po->xltype;
+}
+
 AddIn xai_csv_parse(
 	Function(XLL_LPOPER, "xll_csv_parse", "CSV.PARSE")
 	.Arguments({
@@ -101,10 +116,10 @@ LPOPER WINAPI xll_range_convert(LPOPER prange, const LPOPER ptypes, BOOL header)
 		}
 		ensure(po->columns() == ptypes->size());
 
-		for (unsigned i = 0; i < po->columns(); ++i) {
-			const auto& type = (ptypes)[i];
+		for (unsigned j = 0; j < po->columns(); ++j) {
+			const auto& type = (*ptypes)[j];
 			if (type) {
-				for (unsigned j = header; j < po->rows(); ++j) {
+				for (unsigned i = header; i < po->rows(); ++i) {
 					parse::convert((*po)(i, j), type);
 				}
 			}

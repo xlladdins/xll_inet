@@ -37,10 +37,9 @@ namespace xll::csv {
 				continue;
 			}
 
-			for (auto f : parse::iterator<T>(r, fs, 0, 0, e)) {
+			for (const auto& f : parse::iterator<T>(r, fs, 0, 0, e)) {
 				double num = parse::to_number<T>(f);
 				if (!isnan(num)) {
-					ensure(!f.skipws());
 					row.push_right(XOPER<X>(num));
 				}
 				else {
@@ -50,7 +49,7 @@ namespace xll::csv {
 
 			//xlerrNA
 			if (row.size() < o.columns()) {
-				row.resize(1, row.columns()); // pad
+				row.resize(1, o.columns()); // pad
 			}
 			/*
 			else if (o and row.size() > o.columns()) {

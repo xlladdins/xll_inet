@@ -70,6 +70,16 @@ namespace xll::parse {
 		return num;
 	}
 
+	template<class T>
+	inline double to_number(const fms::view<T>& v)
+	{
+		fms::view<T> v_(v);
+
+		double num = to_number<T>(v_);
+
+		return !v_.skipws() ? num : std::numeric_limits<double>::quiet_NaN();
+	}
+
 	template<class X>
 	inline void convert(XOPER<X>& o, const XOPER<X>& type)
 	{

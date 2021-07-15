@@ -2,7 +2,7 @@
 #pragma once
 #include <iosfwd>
 #include "xll/xll/xll.h"
-#include "xll_parse.h"
+#include "xll_csv.h"
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
 The function <code>JSON.PARSE(string)</code> parses the JSON <code>string</code> into an <code>OPER</code>.
@@ -96,46 +96,40 @@ namespace xll::json {
 		return OPER("\"") & Excel(xlfSubstitute, s, OPER("\""), OPER("\\\"")) & OPER("\"");
 	}
 
-	// lookup 0-based index of i in v
+	// index of k in o
 	template<class X>
-	inline unsigned match(const XOPER<X>& v, const XOPER<X>& i)
+	inline XOPER<X> match(const XOPER<X>& o, const XOPER<X>& k)
 	{
-		unsigned vi = (unsigned)-1;
+		X k1 = o; // first row of v
+		k1.val.array.rows = 1;
 
-		if (i.is_num()) {
-			vi = static_cast<unsigned>(i.val.num);
-		}
-		else if (i.is_str()) {
-			X v1 = v; // first row of v
-			v1.val.array.rows = 1;
-			XOPER<X> vi0 = Excel(xlfMatch, i, v1, XOPER<X>(0)); // exact
-			if (vi0.is_num()) {
-				vi = static_cast<unsigned>(vi0.val.num - 1); // 0-based
-			}
+		auto vi = Excel(xlfMatch, k, k1, XOPER<X>(0)); // exact
+		if (vi.is_num()) {
+			vi = vi.as_num() - 1; // 0 based
 		}
 
 		return vi;
 	}
-		
+	
 	// multi-level index into JSON value
-	template<class X>
-	inline const XOPER<X>& index(const XOPER<X>& v, XOPER<X> i)
+	template<class X, class T = xll::traits<X>::xchar>
+	inline XOPER<X>& index(XOPER<X>& v, XOPER<X> i)
 	{
-		auto vi0 = match(v, i[0]);
-		ensure(vi0 != (unsigned)-1);
-
-		return i.size() == 1 ? v(1, vi0) : index(v(1, vi0), i.drop(1));
-	}
-
-	// append contents of w to v.
-	template<class X>
-	inline XOPER<X>& concat(XOPER<X>& v, const XOPER<X>& w)
-	{
-		for (unsigned i = 0; i < w.columns(); ++i) {
-			v.push_right(json::object<X>(w(0,i), w(1,i)));
+		// jq dotted string
+		if (i.is_str() and i.val.str[0] and i.val.str[1] == '.') {
+			fms::view<T> vi(i.val.str + 2, i.val.str[0] - 1);
+			i = csv::parse<X,T>(vi, T(0), _T('.'), T(0));
 		}
 
-		return v;
+		auto vi0 = i.is_str() ? match(v, i[0]) : i;
+		ensure(vi0.is_num());
+		unsigned vi = static_cast<unsigned>(vi0.val.num);
+
+		if (i.size() == 1) {
+			return type(v) == TYPE::Object ? v(1, vi) : v[vi];
+		}
+		
+		return index(v(1, vi), i.drop(1));
 	}
 
 	template<class X, class T>
@@ -238,9 +232,12 @@ namespace xll::json {
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			auto i = json::array("a", "b");
- 			ensure(index(o, i[0]) == json::object("b", 2));
-			ensure(index(o, i[1]) == 1.23);
-			ensure(index(o, i) == 2);
+ 			ensure(json::index(o, i[0]) == json::object("b", 2));
+			ensure(json::index(o, OPER(".a")) == json::object("b", 2));
+			ensure(json::index(o, i[1]) == 1.23);
+			ensure(json::index(o, OPER(".b")) == 1.23);
+			ensure(json::index(o, i) == 2);
+			ensure(json::index(o, OPER(".a.b")) == 2);
 			auto s = json::stringify<XLOPERX, TCHAR>(o);
 			ensure(s == _T("{\"a\":{\"b\":2},\"b\":1.23}"));
 		}
@@ -249,7 +246,7 @@ namespace xll::json {
 				                  json::object("b", OPER::Err::Null), true);
 			auto v = json::object("a", json::object("b", OPER::Err::Null));
 			auto w = json::object("b", true);
-			v = concat(v, w);
+			v.push_right(w);
 			ensure(v == o);
 			auto s = json::stringify<XLOPERX, TCHAR>(o);
 			ensure(s == _T("{\"a\":{\"b\":null},\"b\":true}"));
@@ -344,7 +341,7 @@ namespace xll::json::parse {
 			auto key = string<X,T>(v);
 			v.skipws();
 			v.eat(':');
-			x = concat(x, json::object<X>(key, value<X,T>(v)));
+			x.push_right(json::object<X>(key, value<X,T>(v)));
 			v.skipws();
 			if (v.front() == ',') {
 				v.eat(',');

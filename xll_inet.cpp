@@ -326,6 +326,59 @@ HANDLEX WINAPI xll_view_drop(HANDLEX h, LONG count)
     return h;
 }
 
+AddIn xai_range_chop(
+    Function(XLL_LPOPER, "xll_range_chop", "RANGE.CHOP")
+    .Arguments({
+        Arg(XLL_LPOPER, "range", "is a range"),
+        Arg(XLL_LONG, "count", "is then number of things to chop."),
+        })
+        .Category("XLL")
+    .FunctionHelp("Take from the beginning (count > 0) or drop from the end (count < 0) of a range.")
+    .Documentation(R"(
+Take <code>count</code> rows from the top of <code>range</code> if <code>count > 0</code>
+or drop <code>-count</code> rows from the end of the range if <code>count < 0</code>.
+If <code>range</code> has one row then take/drop from the front/back.
+If <code>range</code> is a handle perform the function on the in-memory range
+and return the handle;
+)")
+);
+LPOPER WINAPI xll_range_chop(LPOPER prange, LONG n)
+{
+#pragma XLLEXPORT
+    if (prange->is_num()) {
+        handle<OPER> h(prange->val.num);
+        if (h and h->is_multi()) {
+            auto p = xll_range_chop(h.ptr(), n);
+            h->val.array.rows = p->val.array.rows;
+            h->val.array.columns = p->val.array.columns;
+        }
+    }
+    else if (prange->is_multi()) {
+        if (n >= 0) {
+            if (prange->val.array.rows > 1) {
+                n = std::min(n, (LONG)prange->val.array.rows);
+                prange->val.array.rows = n;
+            }
+            else {
+                n = std::min(n, (LONG)prange->val.array.columns);
+                prange->val.array.columns = n;
+            }
+        }
+        else {
+            if (prange->val.array.rows > 1) {
+                n = std::max(n, -(LONG)prange->val.array.rows);
+                prange->val.array.rows += n;
+            }
+            else {
+                n = std::max(n, -(LONG)prange->val.array.columns);
+                prange->val.array.columns += n;
+            }
+        }
+    }
+
+    return prange;
+}
+
 #if 0
 // up to 254 instances of split buffers
 static unsigned int buf_index = 0;
