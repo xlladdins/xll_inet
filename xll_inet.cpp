@@ -4,10 +4,18 @@
 
 using namespace xll;
 
-#define X(a, b) XLL_CONST(LONG, ##a, ##a, b, CATEGORY, INET_INTERNET_FLAG_TOPIC)
-INET_INTERNET_FLAG(X)
-INET_ICU(X)
-#undef X
+#define XLL_TOPIC INET_INTERNET_FLAG_TOPIC
+INET_INTERNET_FLAG(XLL_CONST_DEFAULT)
+#undef XLL_TOPIC
+
+#define XLL_TOPIC INET_INTERNET_FLAG_TOPIC
+INET_ICU(XLL_CONST_DEFAULT)
+#undef XLL_TOPIC
+
+#define XLL_TOPIC INET_SCHEME_TOPIC
+INET_SCHEME(XLL_CONST_DEFAULT)
+#undef XLL_TOPIC
+
 
 //#define XLL_STR(s) XLOPER{ .val = { .w = _countof(s)}, .xltype = xltypeStr}
 
@@ -76,38 +84,228 @@ LPOPER WINAPI xll_inet_canonicalize_url(LPCTSTR url, LONG flags)
     return &curl;
 }
 
+enum URL_COMPONENTS_KEYS {
+    SCHEME,
+    HOST,
+    PORT,
+    USER,
+    PASS,
+    PATH,
+    EXTRA
+};
+
+static OPER url_keys({
+     OPER("scheme"),
+     OPER("host"),
+     OPER("port"),
+     OPER("user"),
+     OPER("pass"),
+     OPER("path"),
+     OPER("extra")
+});
+
 AddIn xai_inet_crack_url(
     Function(XLL_LPOPER, "xll_inet_crack_url", "INET.CRACK_URL")
     .Arguments({
-        Arg(XLL_CSTRING, "url", "is a URL."),
-        Arg(XLL_LONG, "_flag", "is an optional flags that is either ICU_DECODE() or ICU_ESCAPE().")
+        Arg(XLL_PSTRING, "url", "is a URL."),
+        Arg(XLL_LONG, "_flag", "is an optional flags that is either ICU_DECODE() or ICU_ESCAPE()."),
+        Arg(XLL_BOOL, "_headers", "is an optional boolean indicating header keys should be returned.")
         })
     .Category(CATEGORY)
     .FunctionHelp("Cracks a URL into its component parts.")
-    .HelpTopic(https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetcrackurla)
+    .HelpTopic("https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetcrackurla")
 .Documentation(R"(
+This function returns the scheme, host, port, user, password, path, and extra information
+of a URL. 
 )")
 );
-LPOPER WINAPI xll_inet_crack_url(LPCTSTR url, LONG flags)
+LPOPER WINAPI xll_inet_crack_url(LPCTSTR url, LONG flags, BOOL header)
 {
 #pragma XLLEXPORT
     static OPER curl;
-    URL_COMPONENTS urlc;
 
-    ZeroMemory(&urlc, sizeof(urlc));
-    urlc.dwStructSize = sizeof(urlc);
+    try {
+        curl = OPER(1, 7);
+        for (unsigned i = 0; i < 7; ++i) {
+            if (i != PORT) {
+                curl[i] = OPER(_T(""), 255);
+            }
+        }
 
-    DWORD len = 255;
-    curl = OPER(_T(""), len);
-    if (!InternetcrackUrl(url, curl.val.str + 1, &len, flags)) {
-        curl = ErrValue;
+        URL_COMPONENTS urlc;
+        ZeroMemory(&urlc, sizeof(urlc));
+        urlc.dwStructSize = sizeof(urlc);
+
+        urlc.lpszScheme = curl[SCHEME].val.str + 1;
+        urlc.dwSchemeLength = 255;
+        urlc.lpszHostName = curl[HOST].val.str + 1;
+        urlc.dwHostNameLength = 255;
+        urlc.lpszUserName = curl[USER].val.str + 1;
+        urlc.dwUserNameLength = 255;
+        urlc.lpszPassword = curl[PASS].val.str + 1;
+        urlc.dwPasswordLength = 255;
+        urlc.lpszUrlPath = curl[PATH].val.str + 1;
+        urlc.dwUrlPathLength = 255;
+        urlc.lpszExtraInfo = curl[EXTRA].val.str + 1;
+        urlc.dwExtraInfoLength = 255;
+
+        ensure(InternetCrackUrl(url + 1, url[0], flags, &urlc));
+        curl[SCHEME].val.str[0] = (TCHAR)urlc.dwSchemeLength;
+        curl[HOST].val.str[0] = (TCHAR)urlc.dwHostNameLength;
+        curl[PORT] = urlc.nPort;
+        curl[USER].val.str[0] = (TCHAR)urlc.dwUserNameLength;
+        curl[PASS].val.str[0] = (TCHAR)urlc.dwPasswordLength;
+        curl[PATH].val.str[0] = (TCHAR)urlc.dwUrlPathLength;
+        curl[EXTRA].val.str[0] = (TCHAR)urlc.dwExtraInfoLength;
+
+        if (header) {
+            curl = url_keys.push_bottom(curl);
+        }
     }
-    else {
-        curl.val.str[0] = static_cast<TCHAR>(len);
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        curl = ErrValue;
     }
 
     return &curl;
 }
+
+AddIn xai_inet_create_url(
+    Function(XLL_LPOPER, "xll_inet_create_url", "INET.CREATE_URL")
+    .Arguments({
+        Arg(XLL_LPOPER, "scheme", "is the URL scheme."),
+        Arg(XLL_PSTRING, "host", "is the host."),
+        Arg(XLL_WORD, "_port", "is the optional port number if scheme is not specified."),
+        Arg(XLL_PSTRING, "path", "is the path."),
+        Arg(XLL_PSTRING, "_user", "is the optional user."),
+        Arg(XLL_PSTRING, "_pass", "is the optional password."),
+        Arg(XLL_PSTRING, "_extra", "is the optional extra information."),
+        Arg(XLL_LONG, "_flag", "is an optional flags that is either ICU_DECODE() or ICU_ESCAPE()."),
+        })
+    .Category(CATEGORY)
+    .FunctionHelp("creates a URL into its component parts.")
+    .HelpTopic("https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetcreateurla")
+    .Documentation(R"(
+This function creates a URL from the scheme, host, port, user, password, path, and extra information.
+If scheme is a one dimensional array then it uses the components in the specified order.
+If the scheme has two rows then the first row specifies the keys.
+)")
+);
+LPOPER WINAPI xll_inet_create_url(LPOPER pscheme, LPTSTR host, WORD port, LPTSTR path,
+    LPTSTR user, LPTSTR pass, LPTSTR extra, LONG flags)
+{
+#pragma XLLEXPORT
+    static OPER curl;
+
+    try {
+        LPTSTR scheme = nullptr;
+        if (pscheme->is_multi()) {
+            auto n = pscheme->size();
+            if (pscheme->rows() == 1 or pscheme->columns() == 1) {
+                if (SCHEME < n) {
+                    scheme = (*pscheme)[SCHEME].val.str;
+                }
+                if (HOST < n) {
+                    host = (*pscheme)[HOST].val.str;
+                }
+                if (PORT < n) {
+                    port = static_cast<WORD>((*pscheme)[PORT].val.num);
+                }
+                if (PATH < n) {
+                    path = (*pscheme)[PATH].val.str;
+                }
+                if (USER < n) {
+                    user = (*pscheme)[USER].val.str;
+                }
+                if (PASS < n) {
+                    pass = (*pscheme)[PASS].val.str;
+                }
+                if (EXTRA < n) {
+                    extra = (*pscheme)[EXTRA].val.str;
+                }
+            }
+            else {
+                ensure(0 == n % 2);
+                pscheme->resize(2, n / 2);
+                OPER o;
+                o = Excel(xlfHlookup, url_keys[SCHEME], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    ensure(o.is_str());
+                    scheme = o.val.str;
+                }
+                o = Excel(xlfHlookup, url_keys[HOST], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    ensure(o.is_str());
+                    host = o.val.str;
+                }
+                o = Excel(xlfHlookup, url_keys[PORT], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    // if string lookup?
+                    ensure(o.is_num());
+                    port = static_cast<WORD>((*pscheme)[PORT].val.num);
+                }
+                o = Excel(xlfHlookup, url_keys[PATH], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    ensure(o.is_str());
+                    path = o.val.str;
+                }
+                o = Excel(xlfHlookup, url_keys[USER], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    ensure(o.is_str());
+                    user = o.val.str;
+                }
+                o = Excel(xlfHlookup, url_keys[PASS], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    ensure(o.is_str());
+                    pass = o.val.str;
+                }
+                o = Excel(xlfHlookup, url_keys[EXTRA], *pscheme, OPER(2), OPER(false));
+                if (o) {
+                    ensure(o.is_str());
+                    extra = o.val.str;
+                }
+            }
+        }
+ 
+        URL_COMPONENTS urlc;
+        ZeroMemory(&urlc, sizeof(urlc));
+        urlc.dwStructSize = sizeof(urlc);
+
+        urlc.lpszScheme = pscheme->val.str + 1;
+        urlc.dwSchemeLength = pscheme->val.str[0];
+        urlc.lpszHostName = host + 1;
+        urlc.dwHostNameLength = host[0];
+        if (port) {
+            urlc.nPort = port;
+        }
+        urlc.lpszUserName = user + 1;
+        urlc.dwUserNameLength = user[0];
+        urlc.lpszPassword = pass + 1;
+        urlc.dwPasswordLength = pass[0];
+        urlc.lpszUrlPath = path + 1;
+        urlc.dwUrlPathLength = path[0];
+        urlc.lpszExtraInfo = extra + 1;
+        urlc.dwExtraInfoLength = extra[0];
+
+        DWORD len = 255;
+        curl = OPER(_T(""), 255);
+        ensure(InternetCreateUrl(&urlc, flags, curl.val.str + 1, &len));
+        curl.val.str[0] = static_cast<TCHAR>(len);
+
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        curl = ErrValue;
+    }
+
+    return &curl;
+}
+
+#ifdef _DEBUG
+
+#endif // _DEBUG
 
 AddIn xai_inet_read_file(
     Function(XLL_HANDLEX, "xll_inet_read_file", "\\URL.VIEW")
@@ -141,8 +339,9 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
         OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
         head.append(headers(*pheaders));
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
-        ensure(hurl || !"\\INET.READ: failed to open URL")
+        ensure(hurl || !"\\INET.READ: failed to open URL");
  
+        // !!! Use InternetQueryDataAvailable
         DWORD len = 4096; // ??? page size
         *h_->buf = 0; // buffer index when split
         char* buf = h_->buf;
@@ -160,50 +359,12 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     return h;
 }
 
-template<class T>
-fms::view<T> drop_take_n(fms::view<T> v, LONG off, LONG len)
-{
-    v.drop(off);
-
-    if (len == 0) {
-        len = (LONG)v.len;
-    }
-    v.take(len);
-    
-    return v;
-}
-
-template<class T>
-fms::view<T> drop_take_c(fms::view<T> v, LONG off, int c)
-{
-    if (off != -1) {
-        v.drop(off);
-    }
-
-    if (off >= 0) {
-        LONG len = 0;
-        while (len < (LONG)v.len and v.buf[len] != c) {
-            ++len;
-        }
-        v.take(len);
-    }
-    else if (off < 0) {
-        long len = -1;
-        while (-len < (LONG)v.len and v.buf[v.len + len] != c) {
-            --len;
-        }
-        v.take(len + 1);
-    }
-
-    return v;
-}
-
 AddIn xai_view(
     Function(XLL_LPOPER, "xll_view", "VIEW")
     .Arguments({
         Arg(XLL_HANDLEX, "handle", "is a handle returned by \\URL.VIEW."),
         Arg(XLL_LONG, "_offset", "is the view offset. Default is 0."),
-        Arg(XLL_LPOPER, "_count", "is the number of characters to return. Default is all.")
+        Arg(XLL_LONG, "_count", "is the number of characters to return. Default is all.")
         })
     .FunctionHelp("Return substring of view.")
     .Category(CATEGORY)
@@ -214,7 +375,7 @@ first character of this string if offset is positive. If offset is negative
 the all characters up to the last occurence are taken.
 )xyzyx")
 );
-LPOPER WINAPI xll_view(HANDLEX h, LONG off, LPOPER plen)
+LPOPER WINAPI xll_view(HANDLEX h, LONG off, LONG len)
 {
 #pragma XLLEXPORT
     static OPER result;
@@ -229,18 +390,12 @@ LPOPER WINAPI xll_view(HANDLEX h, LONG off, LPOPER plen)
             v->drop(3);
         }
 
-        if (off > (LONG)v->len or off < -(LONG)v->len) {
-            result = ErrNA;
+        if (off != 0) {
+            v->drop(off);
         }
-        else if (plen->is_num()) {
-            LONG len = (LONG)plen->val.num;
-            *v = drop_take_n(*v, off, len);
+        if (len != 0) {
+            v->take(len);
         }
-        else if (plen->is_str() and plen->val.str[0] > 0) {
-            int c = plen->val.str[1];
-            *v = drop_take_c(*v, off, c);
-        }
-        // else noop
 
         result = OPER(v->buf, v->len);
     }
@@ -252,49 +407,6 @@ LPOPER WINAPI xll_view(HANDLEX h, LONG off, LPOPER plen)
 
     return &result;
 }
-
-#ifdef _DEBUG
-
-Auto<OpenAfter> xaoa_view_test([]() {
-    try {
-        fms::view<const char> v("abcde");
-
-        {
-            ensure(drop_take_n(v, 0, 0).equal(v));
-            ensure(drop_take_n(v, 0, 5).equal(v));
-            ensure(drop_take_n(v, 0, 6).equal(v));
-            ensure(drop_take_n(v, 0, -7).equal(v));
-
-            ensure(drop_take_c(v, 0, 'f').equal(v));
-            ensure(drop_take_c(v, 0, 'f').equal(v));
-            ensure(drop_take_c(v, 0, 'f').equal(v));
-            ensure(drop_take_c(v, 0, 'f').equal(v));
-
-            ensure(drop_take_n(v, 5, 0).len == 0);
-        }
-        {
-            fms::view<const char> w("abc");
-            ensure(drop_take_n(v, 0, 3).equal(w));
-            ensure(drop_take_c(v, 0, 'd').equal(w));
-        }
-        {
-            fms::view<const char> w("cde");
-            ensure(drop_take_n(v, 2, 3).equal(w));
-            ensure(drop_take_n(v, 2, 0).equal(w));
-            ensure(drop_take_c(v, -1, 'b').equal(w));
-        }
-
-    }
-    catch (const std::exception& ex) {
-        XLL_ERROR(ex.what());
-
-        return FALSE;
-    }
-
-    return TRUE;
-});
-
-#endif // _DEBUG
 
 AddIn xai_view_len(
     Function(XLL_LPOPER, "xll_view_len", "VIEW.LEN")
