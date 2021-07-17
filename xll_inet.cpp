@@ -197,78 +197,92 @@ If scheme is a one dimensional array then it uses the components in the specifie
 If the scheme has two rows then the first row specifies the keys.
 )")
 );
-LPOPER WINAPI xll_inet_create_url(LPOPER pscheme, LPTSTR host, WORD port, LPTSTR path,
+LPOPER WINAPI xll_inet_create_url(const LPOPER pscheme, LPTSTR host, WORD port, LPTSTR path,
     LPTSTR user, LPTSTR pass, LPTSTR extra, LONG flags)
 {
 #pragma XLLEXPORT
     static OPER curl;
 
     try {
+        OPER o(1, 7);
         LPTSTR scheme = nullptr;
         if (pscheme->is_multi()) {
             auto n = pscheme->size();
             if (pscheme->rows() == 1 or pscheme->columns() == 1) {
                 if (SCHEME < n) {
-                    scheme = (*pscheme)[SCHEME].val.str;
+                    const auto& si = (*pscheme)[SCHEME];
+                    ensure(si.is_str());
+                    scheme = si.val.str;
                 }
                 if (HOST < n) {
-                    host = (*pscheme)[HOST].val.str;
+                    const auto& si = (*pscheme)[HOST];
+                    ensure(si.is_str());
+                    host = si.val.str;
                 }
                 if (PORT < n) {
-                    port = static_cast<WORD>((*pscheme)[PORT].val.num);
+                    const auto& si = (*pscheme)[PORT];
+                    ensure(si.is_num()); // look up if string???
+                    port = static_cast<WORD>(si.val.num);
                 }
                 if (PATH < n) {
-                    path = (*pscheme)[PATH].val.str;
+                    const auto& si = (*pscheme)[PATH];
+                    ensure(si.is_str());
+                    path = si.val.str;
                 }
                 if (USER < n) {
-                    user = (*pscheme)[USER].val.str;
+                    const auto& si = (*pscheme)[USER];
+                    ensure(si.is_str());
+                    user = si.val.str;
                 }
                 if (PASS < n) {
-                    pass = (*pscheme)[PASS].val.str;
+                    const auto& si = (*pscheme)[PASS];
+                    ensure(si.is_str());
+                    pass = si.val.str;
                 }
                 if (EXTRA < n) {
-                    extra = (*pscheme)[EXTRA].val.str;
+                    const auto& si = (*pscheme)[EXTRA];
+                    ensure(si.is_str());
+                    extra = si.val.str;
                 }
             }
             else {
                 ensure(0 == n % 2);
                 pscheme->resize(2, n / 2);
-                OPER o;
-                o = Excel(xlfHlookup, url_keys[SCHEME], *pscheme, OPER(2), OPER(false));
-                if (o) {
-                    ensure(o.is_str());
-                    scheme = o.val.str;
+                o[SCHEME] = Excel(xlfHlookup, url_keys[SCHEME], *pscheme, OPER(2), OPER(false));
+                if (o[SCHEME]) {
+                    ensure(o[SCHEME].is_str());
+                    scheme = o[SCHEME].val.str;
                 }
-                o = Excel(xlfHlookup, url_keys[HOST], *pscheme, OPER(2), OPER(false));
-                if (o) {
-                    ensure(o.is_str());
-                    host = o.val.str;
+                o[HOST] = Excel(xlfHlookup, url_keys[HOST], *pscheme, OPER(2), OPER(false));
+                if (o[HOST]) {
+                    ensure(o[HOST].is_str());
+                    host = o[HOST].val.str;
                 }
-                o = Excel(xlfHlookup, url_keys[PORT], *pscheme, OPER(2), OPER(false));
-                if (o) {
+                o[PORT] = Excel(xlfHlookup, url_keys[PORT], *pscheme, OPER(2), OPER(false));
+                if (o[PORT]) {
                     // if string lookup?
-                    ensure(o.is_num());
-                    port = static_cast<WORD>((*pscheme)[PORT].val.num);
+                    ensure(o[PORT].is_num());
+                    port = static_cast<WORD>(o[PORT].val.num);
                 }
-                o = Excel(xlfHlookup, url_keys[PATH], *pscheme, OPER(2), OPER(false));
-                if (o) {
-                    ensure(o.is_str());
-                    path = o.val.str;
+                o[PATH] = Excel(xlfHlookup, url_keys[PATH], *pscheme, OPER(2), OPER(false));
+                if (o[PATH]) {
+                    ensure(o[PATH].is_str());
+                    path = o[PATH].val.str;
                 }
-                o = Excel(xlfHlookup, url_keys[USER], *pscheme, OPER(2), OPER(false));
-                if (o) {
-                    ensure(o.is_str());
-                    user = o.val.str;
+                o[USER] = Excel(xlfHlookup, url_keys[USER], *pscheme, OPER(2), OPER(false));
+                if (o[USER]) {
+                    ensure(o[USER].is_str());
+                    user = o[USER].val.str;
                 }
-                o = Excel(xlfHlookup, url_keys[PASS], *pscheme, OPER(2), OPER(false));
-                if (o) {
-                    ensure(o.is_str());
-                    pass = o.val.str;
+                o[PASS] = Excel(xlfHlookup, url_keys[PASS], *pscheme, OPER(2), OPER(false));
+                if (o[PASS]) {
+                    ensure(o[PASS].is_str());
+                    pass = o[PASS].val.str;
                 }
-                o = Excel(xlfHlookup, url_keys[EXTRA], *pscheme, OPER(2), OPER(false));
-                if (o) {
-                    ensure(o.is_str());
-                    extra = o.val.str;
+                o[EXTRA] = Excel(xlfHlookup, url_keys[EXTRA], *pscheme, OPER(2), OPER(false));
+                if (o[EXTRA]) {
+                    ensure(o[EXTRA].is_str());
+                    extra = o[EXTRA].val.str;
                 }
             }
         }
@@ -277,8 +291,14 @@ LPOPER WINAPI xll_inet_create_url(LPOPER pscheme, LPTSTR host, WORD port, LPTSTR
         ZeroMemory(&urlc, sizeof(urlc));
         urlc.dwStructSize = sizeof(urlc);
 
-        urlc.lpszScheme = pscheme->val.str + 1;
-        urlc.dwSchemeLength = pscheme->val.str[0];
+        if (scheme) {
+            urlc.lpszScheme = scheme + 1;
+            urlc.dwSchemeLength = scheme[0];
+        }
+        else {
+            urlc.lpszScheme = nullptr;
+            urlc.dwSchemeLength = 0;
+        }
         urlc.lpszHostName = host + 1;
         urlc.dwHostNameLength = host[0];
         if (port) {
