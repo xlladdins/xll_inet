@@ -96,41 +96,140 @@ namespace xll::json {
 		return OPER("\"") & Excel(xlfSubstitute, s, OPER("\""), OPER("\\\"")) & OPER("\"");
 	}
 
-	// index of k in o
+	// first row of o
 	template<class X>
-	inline XOPER<X> match(const XOPER<X>& o, const XOPER<X>& k)
+	const X keys(const XOPER<X>& o)
 	{
-		X k1 = o; // first row of v
-		k1.val.array.rows = 1;
+		ensure(json::type(o) == json::TYPE::Object);
 
-		auto vi = Excel(xlfMatch, k, k1, XOPER<X>(0)); // exact
-		if (vi.is_num()) {
-			vi = vi.as_num() - 1; // 0 based
-		}
+		X k = o;
+		k.val.array.rows = 1;
 
-		return vi;
+		return k;
 	}
-	
-	// multi-level index into JSON value
+
+	// 0-based index of k in first row of o
+	template<class X>
+	inline unsigned match(const XOPER<X>& o, const XOPER<X>& k)
+	{
+		auto i = Excel(xlfMatch, k, keys(o), XOPER<X>(0)); // exact
+		ensure(i.is_num());
+
+		return static_cast<unsigned>(i.val.num - 1);
+	}
+
+	// convert jq dotted index to array
+	// array indices do not have [brackets]
 	template<class X, class T = xll::traits<X>::xchar>
-	inline XOPER<X>& index(XOPER<X>& v, XOPER<X> i)
+	inline XOPER<X> to_index(const XOPER<X>& i)
 	{
-		// jq dotted string
-		if (i.is_str() and i.val.str[0] and i.val.str[1] == '.') {
-			fms::view<T> vi(i.val.str + 2, i.val.str[0] - 1);
-			i = csv::parse<X,T>(vi, T(0), _T('.'), T(0));
+		ensure(i.is_str());
+		ensure(i.val.str[0] and i.val.str[1] == '.');
+
+		auto v = view<T>(i.val.str + 2, i.val.str[0] - 1);
+
+		XOPER<X> is;
+		for (const auto& i_ : parse::iterator<T>(v, T('.'), T(0), T(0), T(0))) {
+			XOPER<X> _i(i_.buf, i_.len);
+			if (_i.val.str[0] and isdigit(_i.val.str[1])) {
+				is.push_right(Excel(xlfValue, _i)); // might be #VALUE!
+			}
+			else {
+				is.push_right(_i); // might be ""
+			}
 		}
 
-		auto vi0 = i.is_str() ? match(v, i[0]) : i;
-		ensure(vi0.is_num());
-		unsigned vi = static_cast<unsigned>(vi0.val.num);
-
-		if (i.size() == 1) {
-			return type(v) == TYPE::Object ? v(1, vi) : v[vi];
-		}
-		
-		return index(v(1, vi), i.drop(1));
+		return is;
 	}
+
+	// convert array of keys to a jq dotted key
+	template<class X, class T = xll::traits<X>::xchar>
+	inline XOPER<X> from_index(const XOPER<X>& is)
+	{
+		static XOPER<X> z("0");
+		static XOPER<X> dot(".");
+		XOPER<X> index;
+
+		for (auto i : is) {
+			if (i.is_str()) {
+				index.append(dot).append(i);
+			}
+			else if (i.is_num()) {
+				ensure(i.as_num() >= 0);
+				ensure(std::trunc(i.val.num) == i.val.num);
+
+				index.append(dot).append(Excel(xlfText, i, z));
+			}
+			// else error???
+		}
+
+		return index;
+	}
+
+	// index into JSON values
+	template<class X>
+	const XOPER<X>& index(const XOPER<X>& o, XOPER<X> k)
+	{
+		ensure(!k.is_err());
+		ensure(k.rows() == 1 or k.columns() == 1);
+
+		auto type = json::type(o);
+
+		// jq dotted index
+		if (k.is_str() and k.val.str[0] and k.val.str[1] == '.') {
+			k = to_index(k);
+		}
+
+		auto k0 = k[0];
+		if (k.size() == 1) {
+			if (type == json::TYPE::Array) {
+				ensure(k0.is_num());
+				ensure(k0.as_num() < o.size());
+
+				return o[static_cast<unsigned>(k0.val.num)];
+			}
+			else if (type == json::TYPE::Object) {
+				ensure(k0.is_str());
+
+				return o(1, match(o, k0));
+			}
+			else {
+				ensure(k0 == 0);
+
+				return o;
+			}
+		}
+		k.drop(1);
+
+		return index(index(o, k0), k);
+	}
+
+
+#ifdef _DEBUG
+
+	template<class X>
+	inline int index_test()
+	{
+		{
+			XOPER<X> i(".a.b.c");
+			auto is = to_index(i);
+			auto i_ = from_index(is);
+			ensure(i == i_);
+		}
+		{
+			XOPER<X> i(".a.0.1");
+			auto is = to_index(i);
+			ensure(is.size() == 3);
+			ensure(is[1] == 0);
+			ensure(is[2] == 1);
+			auto i_ = from_index(is);
+			ensure(i == i_);
+		}
+
+		return 0;
+	}
+
+#endif // _DEBUG
 
 	template<class X, class T>
 	inline std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const xll::XOPER<X>& x)

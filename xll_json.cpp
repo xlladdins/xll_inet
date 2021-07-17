@@ -1,5 +1,4 @@
 #include "xll_json.h"
-#include "xll_csv.h"
 
 using namespace fms;
 using namespace xll;
@@ -196,24 +195,34 @@ static inline bool glob(const XLOPERX& o, const XLOPERX& pat)
 // all subkeys of object matching pattern separated by "."
 inline OPER match_keys(const OPER& v, const OPER& pat, OPER& o)
 {
-	ensure(json::type(v) == json::TYPE::Object);
-	OPER dot(".");
+	static OPER dot(".");
+	static OPER z("0");
 
-	OPER pre;
-	if (auto n = o.size()) {
-		pre = o[n - 1];
-	}
-	for (unsigned i = 0; i < v.columns(); ++i) {
-		if (glob(v(0, i), pat)) {
-			auto type = json::type(v(1, i));
-			if (type == json::TYPE::Object) {
-				o.push_back(pre & dot & v(0, i));
-				match_keys(v(1, i), pat, o);
+	if (v.is_multi()) {
+		OPER pre;
+		if (auto n = o.size()) {
+			pre = o[n - 1];
+		}
+
+		if (json::type(v) == json::TYPE::Object) {
+			for (unsigned i = 0; i < v.columns(); ++i) {
+				if (glob(v(0, i), pat)) {
+					o.push_back(pre & dot & v(0, i));
+					if (v(1, i).is_multi()) {
+						match_keys(v(1, i), pat, o);
+					}
+				}
 			}
-			else if (type == json::TYPE::Array) {
-				// like jq
-				o.push_back(pre & dot & OPER("[") & OPER(i) & OPER("]"));
-				match_keys(v(1, i), pat, o);
+		}
+		else if (json::type(v) == json::TYPE::Array) {
+			for (unsigned i = 0; i < v.size(); ++i) {
+				auto oi = Excel(xlfText, OPER(i), z);
+				if (glob(oi, pat)) { 
+					o.push_back(pre & dot & oi);
+					if (v[i].is_multi()) {
+						match_keys(v[i], pat, o);
+					}
+				}
 			}
 		}
 	}
@@ -266,48 +275,6 @@ LPOPER WINAPI xll_json_keys(LPOPER pjson, LPOPER pkeys)
 	return &o;
 }
 
-// convert jq dotted index to array
-inline OPER to_index(const OPER& i)
-{
-	xchar rs = 0;
-	auto v = view(i.val.str + 1, i.val.str[0]);
-	OPER o = csv::parse<XLOPERX,xchar>(v, rs, _T('.'), rs).drop(1);
-
-	for (auto& oi : o) {
-		if (oi.val.str[0] and oi.val.str[1] == '[') {
-			auto vi = view(oi.val.str + 1, oi.val.str[0]);
-			oi = json::parse::view<XLOPERX,xchar>(vi);
-		}
-	}
-
-	return o;
-}
-
-// convert array of keys to a jq dotted key
-inline OPER from_index(const OPER& is)
-{
-	static OPER dot(".");
-	OPER index;
-
-	if (!is) {
-		index = dot;
-	}
-	else {
-		for (auto i : is) {
-			if (i.is_multi()) {
-				i.resize(1, i.size());
-				index.append(dot).append(json::stringify<XLOPERX>(i).c_str());
-			}
-			else {
-				ensure(i.is_str());
-				index.append(dot).append(i);
-			}
-		}
-	}
-
-	return index;
-}
-
 AddIn xai_json_index(
 	Function(XLL_LPOPER, "xll_json_index", "JSON.VALUE")
 	.Arguments({
@@ -344,7 +311,7 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 		}
 
 		if (pindex->is_str() and pindex->val.str[0] and pindex->val.str[1] == _T('.')) {
-			OPER i = to_index(*pindex);
+			OPER i = json::to_index(*pindex);
 			o = json::index(*pjson, i);
 		}
 		else {
@@ -365,7 +332,20 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 
 #ifdef _DEBUG
 
-Auto<OpenAfter> xaoa_json_test([]() { return 0 == xll::json::test(); });
-Auto<OpenAfter> xaoa_json_parse_test([]() { return 0 == xll::json::parse::test(); });
+Auto<OpenAfter> xaoa_json_test([]() {
+	try {
+		//_crtBreakAlloc = 51990;
+		ensure(0 == xll::json::test());
+		ensure(0 == xll::json::parse::test());
+		ensure(0 == xll::json::index_test<XLOPERX>());
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return FALSE;
+	}
+
+	return TRUE;
+});
 
 #endif // _DEBUG

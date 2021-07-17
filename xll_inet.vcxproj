@@ -127,7 +127,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>different options&gt;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DEBUG_BREAK;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpplatest</LanguageStandard>
@@ -201,7 +201,6 @@
     <ClInclude Include="xll_json.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="enum_http_query.cpp" />
     <ClCompile Include="eod_historical.cpp" />
     <ClCompile Include="xll_csv.cpp" />
     <ClCompile Include="xll_inet.cpp" />

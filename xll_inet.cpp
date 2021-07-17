@@ -4,6 +4,8 @@
 
 using namespace xll;
 
+#define XLL_CATEGORY CATEGORY " Enum"
+
 #define XLL_TOPIC INET_INTERNET_FLAG_TOPIC
 INET_INTERNET_FLAG(XLL_CONST_DEFAULT)
 #undef XLL_TOPIC
@@ -16,6 +18,9 @@ INET_ICU(XLL_CONST_DEFAULT)
 INET_SCHEME(XLL_CONST_DEFAULT)
 #undef XLL_TOPIC
 
+#define XLL_TOPIC INET_HTTP_QUERY_TOPIC
+INET_HTTP_QUERY(XLL_CONST_DEFAULT)
+#undef XLL_TOPIC
 
 //#define XLL_STR(s) XLOPER{ .val = { .w = _countof(s)}, .xltype = xltypeStr}
 

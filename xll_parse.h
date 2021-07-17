@@ -39,7 +39,7 @@ namespace xll::parse {
 	template<>
 	inline double to_number<const char>(fms::view<const char>& v)
 	{
-		char* end;
+		char* end = const_cast<char*>(v.buf) + v.len;
 		double num = strtod(v.buf, &end);
 		if (end == v.buf)
 			return std::numeric_limits<double>::quiet_NaN();
@@ -50,7 +50,7 @@ namespace xll::parse {
 	template<>
 	inline double to_number<wchar_t>(fms::view<wchar_t>& v)
 	{
-		wchar_t* end;
+		wchar_t* end = const_cast<wchar_t*>(v.buf) + v.len;
 		double num = wcstod(v.buf, &end);
 		if (end == v.buf)
 			return std::numeric_limits<double>::quiet_NaN();

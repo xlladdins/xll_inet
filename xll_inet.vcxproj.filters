@@ -38,9 +38,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="enum_http_query.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="xll_inet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
