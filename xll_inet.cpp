@@ -455,10 +455,12 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
         OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
         head.append(headers(*pheaders));
         Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
-        ensure(hurl || !"\\INET.READ: failed to open URL");
+        ensure(hurl || !__FUNCTION__ ": failed to open URL");
  
-        // !!! Use InternetQueryDataAvailable
-        DWORD len = 4096; // ??? page size
+        DWORD len;
+        if (!InternetQueryDataAvailable(hurl, &len, 0, 0)) {
+            len = 4096; // ??? page size
+        }
         *h_->buf = 0; // buffer index when split
         char* buf = h_->buf;
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
@@ -498,7 +500,7 @@ LPOPER WINAPI xll_view(HANDLEX h, LONG off, LONG len)
 
     try {
         handle<fms::view<char>> v(h);
-        ensure(v || !"VIEW: unrecognized handle");
+        ensure(v || !__FUNCTION__ ": unrecognized handle");
 
 
         if (v->len > 3 and v->buf[0] == 0xEF) {
