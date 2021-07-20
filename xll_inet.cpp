@@ -332,6 +332,97 @@ LPOPER WINAPI xll_inet_create_url(const LPOPER pscheme, LPTSTR host, WORD port, 
 
 #endif // _DEBUG
 
+AddIn xai_inet_open_url(
+    Function(XLL_HANDLEX, "xll_inet_open_url", "\\INET.OPEN_URL")
+    .Arguments({
+        Arg(XLL_CSTRING, "url", "is a URL to read."),
+        Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
+        Arg(XLL_LONG, "_flags", "are optional flags from INTERNET_FLAGS_*. Default is 0.")
+        })
+    .Uncalced()
+    .Category(CATEGORY)
+    .FunctionHelp("Return a handle an internet connection.")
+    .HelpTopic("https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla")
+    .Documentation(R"xyzyx(
+Return a handle from
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla">InternetOpenUrl</a>
+)xyzyx")
+);
+HANDLEX WINAPI xll_inet_open_url(LPCTSTR url, LPOPER pheaders, LONG flags)
+{
+#pragma XLLEXPORT
+    HANDLEX h = INVALID_HANDLEX;
+
+    try {
+        DWORD_PTR context = NULL;
+        OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
+        head.append(headers(*pheaders));
+        
+        handle<Inet::HInet> hurl(new Inet::HInet(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context)));
+        h = hurl.get();
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+    }
+
+    return h;
+}
+
+AddIn xai_http_query_info(
+    Function(XLL_LPOPER, "xll_http_query_info", "HTTP.QUERY_INFO")
+    .Arguments({
+        Arg(XLL_HANDLEX, "handle", "is a handle returned by \\INET.OPEN_URL."),
+        Arg(XLL_LPOPER, "info", "is a combination of HTTP_QUERY_* attributes."),
+        })
+    .FunctionHelp("Return substring of view.")
+    .Category(CATEGORY)
+    .HelpTopic("https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-httpqueryinfoa")
+    .Documentation(R"xyzyx(
+Retrieve header information associated with an HTTP request.
+)xyzyx")
+);
+LPOPER WINAPI xll_http_query_info(HANDLEX h, LPOPER pinfo)
+{
+#pragma XLLEXPORT
+    static OPER result;
+
+    try {
+        handle<Inet::HInet> h_(h);
+        ensure(h_);
+
+        if (pinfo->is_num()) {
+            DWORD info = static_cast<DWORD>(pinfo->val.num);
+            DWORD size = 0;
+            HttpQueryInfo(*h_, info, (LPVOID)nullptr, &size, NULL);
+            result = OPER(_T(""), size);
+            HttpQueryInfo(*h_, info, (LPVOID)&result.val.str[1], &size, NULL);
+            ensure(size <= traits<XLOPERX>::charmax);
+            result.val.str[0] = static_cast<TCHAR>(size);
+        }
+        else if (pinfo->is_str()) {
+            // custom header
+            DWORD size = pinfo->val.str[0];
+            HttpQueryInfo(*h_, HTTP_QUERY_CUSTOM, (LPVOID)&pinfo->val.str[1], &size, NULL);
+            result = OPER(pinfo->val.str + 1, size);
+            HttpQueryInfo(*h_, HTTP_QUERY_CUSTOM, (LPVOID)&result.val.str[1], &size, NULL);
+            ensure(size <= traits<XLOPERX>::charmax);
+            result.val.str[0] = static_cast<TCHAR>(size);
+        }
+        else {
+            ensure(!__FUNCTION__ ": expecting a numerical or string info argument");
+        }
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+
+        result = ErrNA;
+    }
+
+    return &result;
+}
+
+// \INET.READ_FILE
+
 AddIn xai_inet_read_file(
     Function(XLL_HANDLEX, "xll_inet_read_file", "\\URL.VIEW")
     .Arguments({
