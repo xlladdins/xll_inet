@@ -19,7 +19,65 @@ inline OPER xll_mktime(const OPER& date)
 	tm.tm_sec = static_cast<int>(Excel(xlfSecond, date).as_num());
 	tm.tm_isdst = -1;
 
-	return OPER(static_cast<double>(mktime(&tm)));
+	time_t t = mktime(&tm);
+
+	return t == (time_t)-1 ? ErrValue : OPER(static_cast<double>(t));
+}
+
+inline OPER xll_localtime(const OPER& time)
+{
+	OPER d = ErrValue;
+
+	const time_t t = static_cast<time_t>(time.val.num);
+	struct tm tm;
+	errno_t err = localtime_s(&tm, &t);
+	if (err == 0) {
+		d = Excel(xlfDate, OPER(tm.tm_year + 1900), OPER(tm.tm_mon + 1), OPER(tm.tm_mday));
+		d = d.as_num() + Excel(xlfTime, OPER(tm.tm_hour), OPER(tm.tm_min), OPER(tm.tm_sec)).as_num();
+	}
+
+	return d;
+}
+
+AddIn xai_mktime_(
+	Function(XLL_LPOPER, "xll_mktime_", "MKTIME")
+	.Arguments({
+		Arg(XLL_DOUBLE, "date", "is an Excel date."),
+		})
+	.Category("XLL")
+	.FunctionHelp("Convert the local time to a calendar value.")
+	.HelpTopic("https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/mktime-mktime32-mktime64")
+	.Documentation(R"()")
+);
+LPOPER WINAPI xll_mktime_(double date)
+{
+#pragma XLLEXPORT
+	static OPER t;
+	
+	t = xll_mktime(OPER(date));
+
+	return &t;
+}
+
+
+AddIn xai_localtime_(
+	Function(XLL_LPOPER, "xll_localtime_", "LOCALTIME")
+	.Arguments({
+		Arg(XLL_DOUBLE, "time", "is a time_t."),
+		})
+	.Category("XLL")
+	.FunctionHelp("Converts a time_t time value to an Excel date and corrects for the local time zone.")
+	.HelpTopic("https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/localtime-s-localtime32-s-localtime64-s")
+	.Documentation(R"()")
+);
+LPOPER WINAPI xll_localtime_(double time)
+{
+#pragma XLLEXPORT
+	static OPER d;
+	
+	d = xll_localtime(OPER(time));
+
+	return &d;
 }
 
 AddIn xai_yahoo_finance(
@@ -43,13 +101,20 @@ LPOPER WINAPI xll_yahoo_finance(LPOPER psymbol, double start, double end, xcstr 
 	static OPER o;
 
 	// number as text, no decimal points, no commas
-	auto fixed = [](const OPER& o) { return Excel(xlfFixed, o, OPER(0), OPER(true));  };
+	auto fixed = [](const OPER& o) { return Excel(xlfFixed, o, OPER(0), OPER(true)); };
 
-	o = YAHOO_URL;
-	o.append((*psymbol)[0]); // one symbol for now
-	o.append("?period1=").append(fixed(xll_mktime(start)));
-	o.append("&period2=").append(fixed(xll_mktime(end ? OPER(end) : Excel(xlfNow))));
-	o.append("&interval=").append(*interval ? interval : _T("1d"));
+	try {
+		o = YAHOO_URL;
+		o.append((*psymbol)[0]); // one symbol for now
+		o.append("?period1=").append(fixed(xll_mktime(start)));
+		o.append("&period2=").append(fixed(xll_mktime(end ? OPER(end) : Excel(xlfNow))));
+		o.append("&interval=").append(*interval ? interval : _T("1d"));
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		o = ErrValue;
+	}
 
 	return &o;
 }

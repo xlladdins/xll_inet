@@ -176,3 +176,44 @@ LPOPER WINAPI xll_range_drop(LPOPER prange, LONG count)
 
 	return &o;
 }
+
+AddIn xai_range_cumprod(
+	Function(XLL_LPOPER, "xll_range_cumprod", "RANGE.CUMPROD")
+	.Arguments({
+		Arg(XLL_LPOPER, "range", "is a range."),
+		})
+	.Category("XLL")
+	.FunctionHelp("Cumulative product of range columns")
+	.Documentation(R"()")
+);
+LPOPER WINAPI xll_range_cumprod(LPOPER prange)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	try {
+		if (prange->is_num()) {
+			handle<OPER> h_(prange->val.num);
+			if (h_) {
+				prange = h_.ptr();
+			}
+		}
+		const OPER& range = *prange;
+		o.resize(range.rows(), range.columns());
+		for (unsigned j = 0; j < o.columns(); ++j) {
+			o(0, j) = range(0, j);
+		}
+		for (unsigned i = 1; i < o.rows(); ++i) {
+			for (unsigned j = 0; j < o.columns(); ++j) {
+				o(i, j) = o(i - 1, j).as_num() * range(i, j).as_num();
+			}
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		o = ErrValue;
+	}
+
+	return &o;
+}
