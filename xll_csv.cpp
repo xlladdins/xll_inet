@@ -34,8 +34,8 @@ AddIn xai_csv_parse(
 		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
 		Arg(XLL_CSTRING, "_fs", "is an optional field separator. Default is comma ','."),
 		Arg(XLL_CSTRING, "_esc", "is an optional escape character. Default is backslash '\\'."),
-		Arg(XLL_WORD, "_offset", "is an optional number of lines to skip. Default is 0."),
-		Arg(XLL_WORD, "_count", "is an optional number of lines to return. Default is all.")
+		Arg(XLL_WORD, "_offset", "is an optional number of rows to skip. Default is 0."),
+		Arg(XLL_LONG, "_count", "is an optional number of rows to return. Default is all.")
 		})
 	.FunctionHelp("Parse CSV string into a range.")
 	.Category("CSV")
@@ -46,7 +46,7 @@ to parse anything that looks like a number, date, or time. The strings
 <code>"TRUE"</code> and <code>"FALSE"</code> are converted to Boolean values.
 )xyzyx")
 );
-LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigned off, unsigned count)
+LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigned off, LONG count)
 {
 #pragma XLLEXPORT
 	static OPER o;
@@ -62,7 +62,7 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 			char e = static_cast<char>(*_e ? *_e : '\\');
 
 			auto v = fms::view<char>(h_->buf, h_->len);
-			o = xll::csv::parse<XLOPERX,char>(v, rs, fs, e, off, count);
+			o = xll::csv::parse<XLOPERX,char>(v, rs, fs, e, off, count >= 0 ? count : 0);
 		}
 		else {
 			ensure(pcsv->is_str());
@@ -72,7 +72,10 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 			xchar e = *_e ? *_e : '\\';
 
 			auto v = fms::view<xchar>(pcsv->val.str + 1, pcsv->val.str[0]);
-			o = xll::csv::parse<XLOPERX>(v, rs, fs, e, off, count);
+			o = xll::csv::parse<XLOPERX>(v, rs, fs, e, off, count >= 0 ? count : 0);
+		}
+		if (count < 0) {
+			o.drop(count);
 		}
 	}
 	catch (const std::exception& ex) {
