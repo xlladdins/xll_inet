@@ -202,6 +202,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="eod_historical.cpp" />
+    <ClCompile Include="xll_array.cpp" />
     <ClCompile Include="xll_csv.cpp" />
     <ClCompile Include="xll_inet.cpp" />
     <ClCompile Include="xll_json.cpp" />
