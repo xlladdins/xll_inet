@@ -13,23 +13,39 @@
 
 namespace xll::csv {
 
-	/*
-	//!!! use xll::codec
-	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> field(fms::view<const T> field)
-	{
-		return decode<X, T>(field);
-	}
-	*/
+	template<class X, class T>
+	struct parser {
+		fms::view<T> buf;
+		T rs, fs, esc;
+
+		parser()
+		{ }
+		parser(const fms::view<T>& buf, T rs, T fs, T esc)
+			: buf(buf), rs(rs), fs(fs), esc(esc)
+		{ }
+		parser(const parser&) = default;
+		parser& operator=(const parser&) = default;
+		~parser()
+		{ }
+
+		parse::iterator<T> record_iterator()
+		{
+			return parse::iterator<T>(buf, rs, 0, 0, esc);
+		}
+		parse::iterator<T> field_iterator(parse::iterator<T>::value_type& record)
+		{
+			return parse::iterator<T>(record, fs, 0, 0, esc);
+		}
+	};
 
 	// use view!!!
 	template<class X, class T>
-	inline XOPER<X> parse(fms::view<T> buf, T rs, T fs, T e, unsigned off = 0, unsigned count = 0)
+	inline XOPER<X> parse(parser<X,T> records, unsigned off = 0, unsigned count = 0)
 	{
 		XOPER<X> o;
-		
-		for (const auto& r : parse::iterator<T>(buf, rs, 0, 0, e)) {
-			OPER row;
+
+		for (auto record : records.record_iterator()) {
+			XOPER<X> row;
 
 			if (off != 0) {
 				--off;
@@ -37,7 +53,7 @@ namespace xll::csv {
 				continue;
 			}
 
-			for (const auto& f : parse::iterator<T>(r, fs, 0, 0, e)) {
+			for (auto f : records.field_iterator(record)) {
 				double num = parse::to_number<T>(f);
 				if (!isnan(num)) {
 					row.push_right(XOPER<X>(num));
@@ -76,7 +92,8 @@ namespace xll::csv {
 	{
 		{
 			fms::view<const T> v(_T("a,b\nc,d"));
-			OPER o = parse<XLOPERX, const T>(v, _T('\n'), _T(','), _T('\\'));
+			parser<XLOPERX, const T> p(v, _T('\n'), _T(','), _T('\\'));
+			OPER o = parse(p);
 			ensure(o.rows() == 2);
 			ensure(o.columns() == 2);
 			ensure(o(0, 0) == "a");

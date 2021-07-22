@@ -19,6 +19,9 @@ AddIn xai_xltype(
 		})
 	.Category("XLL")
 	.FunctionHelp("Returns the type of a cell as a XLTYPE_* enumeration.")
+	.Documentation(R"(
+Unrecognized types are returned as 0.
+)")
 );
 LONG WINAPI xll_xltype(const LPOPER po)
 {
@@ -27,32 +30,52 @@ LONG WINAPI xll_xltype(const LPOPER po)
 	return po->xltype;
 }
 
+AddIn xai_xltype_convert(
+	Function(XLL_LPOPER, "xll_xltype_convert", "XLTYPE.CONVERT")
+	.Arguments({
+		Arg(XLL_LPOPER, "cell", "is a cell to convert."),
+		Arg(XLL_LONG, "type", "is a type from the XLTYPE_* enumeration.")
+		})
+	.Category("XLL")
+	.FunctionHelp("Convert cell to type from XLTYPE_* enumeration.")
+	.Documentation(R"(
+If a conversion fails <code>#VALUE!</code> is returned.
+)")
+);
+LPOPER WINAPI xll_xltype_convert(LPOPER po, LONG type)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	o = *po;
+	parse::convert(o, type);
+
+	return &o;
+}
+
 AddIn xai_csv_parse(
 	Function(XLL_LPOPER, "xll_csv_parse", "CSV.PARSE")
 	.Arguments({
-		Arg(XLL_LPOPER, "string", "is a string of comma separated values or handle."),
+		Arg(XLL_LPOPER, "csv", "is a string of comma separated values or handle."),
 		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
 		Arg(XLL_CSTRING, "_fs", "is an optional field separator. Default is comma ','."),
 		Arg(XLL_CSTRING, "_esc", "is an optional escape character. Default is backslash '\\'."),
-		Arg(XLL_WORD, "_offset", "is an optional number of rows to skip. Default is 0."),
-		Arg(XLL_LONG, "_count", "is an optional number of rows to return. Default is all.")
+		Arg(XLL_LPOPER, "_types", "is an optional array of types from XLTYPE_*."),
+		Arg(XLL_WORD, "_drop", "is an optional number of rows to skip. Default is 0."),
+		Arg(XLL_LONG, "_take", "is an optional number of rows to return. Default is all.")
 		})
 	.FunctionHelp("Parse CSV string into a range.")
 	.Category("CSV")
 	.Documentation(R"xyzyx(
-Convert <code>string</code> to a range. It uses the Excel function
-<a href="https://support.microsoft.com/en-us/office/value-function-257d0108-07dc-437d-ae1c-bc2d3953d8c2"<code>VALUE</code>
-to parse anything that looks like a number, date, or time. The strings
-<code>"TRUE"</code> and <code>"FALSE"</code> are converted to Boolean values.
+Convert comma separated values to a range. 
 )xyzyx")
 );
-LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigned off, LONG count)
+LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, const LPOPER ptypes, unsigned drop, LONG take)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
 	try {
-
 		if (pcsv->is_num()) {
 			handle<fms::view<char>> h_(pcsv->as_num());
 			ensure(h_);
@@ -62,20 +85,56 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 			char e = static_cast<char>(*_e ? *_e : '\\');
 
 			auto v = fms::view<char>(h_->buf, h_->len);
-			o = xll::csv::parse<XLOPERX,char>(v, rs, fs, e, off, count >= 0 ? count : 0);
+			csv::parser<XLOPERX, char> records(v, rs, fs, e);
+
+			unsigned n = ptypes->size();
+			for (auto record : records.record_iterator()) {
+				if (drop > 0 and drop--) continue;
+
+				unsigned i = 0;
+				OPER row;
+				for (auto field : records.field_iterator(record)) {
+					auto fi = OPER(field.buf, field.len);
+					if (i < n) {
+						parse::convert(fi, (*ptypes)[i]);
+					}
+					row.push_right(fi);
+				}
+				o.push_bottom(row);
+
+				if (take > 0 and !--take) break;
+			}
 		}
 		else {
 			ensure(pcsv->is_str());
 
-			xchar rs = *_rs ? *_rs : '\n';
-			xchar fs = *_fs ? *_fs : ',';
-			xchar e = *_e ? *_e : '\\';
+			xchar rs = *_rs ? *_rs : _T('\n');
+			xchar fs = *_fs ? *_fs : _T(',');
+			xchar e = *_e ? *_e : _T('\\');
 
 			auto v = fms::view<xchar>(pcsv->val.str + 1, pcsv->val.str[0]);
-			o = xll::csv::parse<XLOPERX>(v, rs, fs, e, off, count >= 0 ? count : 0);
+			csv::parser<XLOPERX, xchar> records(v, rs, fs, e);
+
+			unsigned n = ptypes->size();
+			for (auto record : records.record_iterator()) {
+				if (drop > 0 and drop--) continue;
+
+				unsigned i = 0;
+				OPER row;
+				for (auto field : records.field_iterator(record)) {
+					auto fi = OPER(field.buf, field.len);
+					if (i < n) {
+						parse::convert(fi, (*ptypes)[i]);
+					}
+					row.push_right(fi);
+				}
+				o.push_bottom(row);
+
+				if (take > 0 and !--take) break;
+			}
 		}
-		if (count < 0) {
-			o.drop(count);
+		if (take < 0) {
+			o.drop(take);
 		}
 	}
 	catch (const std::exception& ex) {
@@ -86,7 +145,7 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e, unsigne
 
 	return &o;
 }
-
+/*
 AddIn xai_range_convert(
 	Function(XLL_LPOPER, "xll_range_convert", "RANGE.CONVERT")
 	.Arguments({
@@ -136,7 +195,7 @@ LPOPER WINAPI xll_range_convert(LPOPER prange, const LPOPER ptypes, BOOL header)
 
 	return &o;
 }
-
+*/
 #ifdef _DEBUG
 
 Auto<OpenAfter> xaoa_test_csv_parse([]() { return xll::csv::test<TCHAR>() == 0; });

@@ -2,6 +2,7 @@
 #pragma once
 #include "xll/xll/fms_view.h"
 
+// phony xltypes
 #define xltypeDate (xltypeNum|xlbitXLFree)
 #define xltypeTime (xltypeNum|xlbitDLLFree)
 
@@ -81,22 +82,33 @@ namespace xll::parse {
 	}
 
 	template<class X>
-	inline void convert(XOPER<X>& o, const XOPER<X>& type)
+	inline void convert(XOPER<X>& o, int type)
 	{
-		ensure(type.is_nil() or type.is_num());
-
 		if (type == xltypeNum || type == xltypeBool || type == xltypeInt) {
 			o = Excel(xlfEvaluate, o);
 			if (type == xltypeBool and !o.is_bool()) {
 				o = !!o;
 				ensure(o.is_bool());
 			}
+			else if (type == xltypeInt) {
+				o.val.w = static_cast<traits<X>::xint>(o.val.num);
+				o.xltype = xltypeInt;
+			}
 		}
 		else if (type == xltypeDate) {
 			o = Excel(xlfDatevalue, o);
+			o.xltype = xltypeDate;
 		}
 		else if (type == xltypeTime) {
 			o = Excel(xlfTimevalue, o);
+			o.xltype = xltypeTime;
+		}
+	}
+	template<class X>
+	inline void convert(XOPER<X>& o, const XOPER<X>& type)
+	{
+		if (type.is_num() and type.as_num() != 0) {
+			convert(o, static_cast<int>(type.as_num()));
 		}
 	}
 

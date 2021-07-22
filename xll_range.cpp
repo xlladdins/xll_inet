@@ -67,20 +67,20 @@ LPOPER WINAPI xll_range_index(LPOPER prange, LPOPER prows, LPOPER pcolumns)
 	static OPER o;
 	
 	try {
-		o = ErrNA;
-		auto r = prows->size();
-		auto c = pcolumns->size();
+		o = ErrValue;
 
 		if (prange->is_num()) {
-			handle<OPER> h_(prange->val.num);
+			handle<OPER> h_(prange->as_num());
 			if (h_) {
 				prange = h_.ptr();
 			}
 		}
 
+		auto r = prows->size();
 		if (prows->is_missing()) {
 			r = prange->rows();
 		}
+		auto c = pcolumns->size();
 		if (pcolumns->is_missing()) {
 			c = prange->columns();
 		}
@@ -131,7 +131,9 @@ LPOPER WINAPI xll_range_take(LPOPER prange, LONG count)
 			}
 		}
 
-		o = prange->take(count);
+		if (prange->is_multi()) {
+			o = prange->take(count);
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -168,7 +170,9 @@ LPOPER WINAPI xll_range_drop(LPOPER prange, LONG count)
 			}
 		}
 
-		o = prange->drop(count);
+		if (prange->is_multi()) {
+			o = prange->drop(count);
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
