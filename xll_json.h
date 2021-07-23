@@ -146,7 +146,6 @@ namespace xll::json {
 	template<class X, class T = xll::traits<X>::xchar>
 	inline XOPER<X> from_index(const XOPER<X>& is)
 	{
-		static XOPER<X> z("0");
 		static XOPER<X> dot(".");
 		XOPER<X> index;
 
@@ -158,7 +157,8 @@ namespace xll::json {
 				ensure(i.as_num() >= 0);
 				ensure(std::trunc(i.val.num) == i.val.num);
 
-				index.append(dot).append(Excel(xlfText, i, z));
+				// no decimals or commas
+				index.append(dot).append(Excel(xlfFixed, i, XOPER<X>(0), XOPER<X>(true)));
 			}
 			// else error???
 		}
@@ -166,13 +166,10 @@ namespace xll::json {
 		return index;
 	}
 
-	// index into JSON values
+	// ref to index into JSON values
 	template<class X>
-	const XOPER<X>& index(const XOPER<X>& o, XOPER<X> k)
+	XOPER<X>& index(XOPER<X>& o, XOPER<X> k)
 	{
-		ensure(!k.is_err());
-		ensure(k.rows() == 1 or k.columns() == 1);
-
 		auto type = json::type(o);
 
 		// jq dotted index
@@ -180,28 +177,24 @@ namespace xll::json {
 			k = to_index(k);
 		}
 
-		auto k0 = k[0];
 		if (k.size() == 1) {
-			if (type == json::TYPE::Array) {
-				ensure(k0.is_num());
-				ensure(k0.as_num() < o.size());
+			auto k_ = Excel(xlfValue, k); // noop if k is num
+			if (k_.is_num()) {
+				ensure(type == json::TYPE::Array);
 
-				return o[static_cast<unsigned>(k0.val.num)];
-			}
-			else if (type == json::TYPE::Object) {
-				ensure(k0.is_str());
-
-				return o(1, match(o, k0));
+				return o[(int)k_.as_num()];
 			}
 			else {
-				ensure(k0 == 0);
-
-				return o;
+				ensure(type == json::TYPE::Object);
+				
+				return o(1, match(o, k));
 			}
 		}
-		k.drop(1);
 
-		return index(index(o, k0), k);
+		ensure(k[0].size() == 1);
+		auto& o0 = index(o, k[0]);
+
+		return index(o0, k.drop(1));
 	}
 
 

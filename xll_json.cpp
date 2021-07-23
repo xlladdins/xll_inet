@@ -334,7 +334,7 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 
 Auto<OpenAfter> xaoa_json_test([]() {
 	try {
-		_crtBreakAlloc = 52957;
+		//_crtBreakAlloc = 52474;
 		ensure(0 == xll::json::test());
 		ensure(0 == xll::json::parse::test());
 		ensure(0 == xll::json::index_test<XLOPERX>());
