@@ -589,9 +589,6 @@ namespace xll::json::parse {
 			ensure(json::index(x, i) == "cd");
 			ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2, 1));
 		}
-		{
-
-		}
 
 		// https://www.wikidata.org/w/api.php?action=wbgetentities&sites=enwiki&titles=Berlin&props=descriptions&languages=en&format=json
 		const char wd[] = "{\"entities\":"
