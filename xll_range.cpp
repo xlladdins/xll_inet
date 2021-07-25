@@ -128,11 +128,13 @@ LPOPER WINAPI xll_range_take(LPOPER prange, LONG count)
 			handle<OPER> h_(prange->val.num);
 			if (h_) {
 				prange = h_.ptr();
+				prange->take(count);
+				o = h_.get();
 			}
 		}
-
-		if (prange->is_multi()) {
-			o = prange->take(count);
+		else {
+			o = *prange;
+			o.take(count);
 		}
 	}
 	catch (const std::exception& ex) {
@@ -167,11 +169,13 @@ LPOPER WINAPI xll_range_drop(LPOPER prange, LONG count)
 			handle<OPER> h_(prange->val.num);
 			if (h_) {
 				prange = h_.ptr();
+				prange->drop(count);
+				o = h_.get();
 			}
 		}
-
-		if (prange->is_multi()) {
-			o = prange->drop(count);
+		else {
+			o = *prange;
+			o.drop(count);
 		}
 	}
 	catch (const std::exception& ex) {
