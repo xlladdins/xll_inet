@@ -3,7 +3,7 @@
 
 namespace fms::PnL {
 
-	enum { Xj, Cj, Gj, Dj, Vj, Aj };
+	enum { Dj, Vj, Aj };
 
 	inline const char fms_pnl_doc[] = R"xyzyx(
 Given prices \(X_j\), cash flows \(C_j\), and trades \(\Gamma_j\)
