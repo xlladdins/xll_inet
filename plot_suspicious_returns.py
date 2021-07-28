@@ -35,11 +35,11 @@ import urllib
 import time
 
 from numpy import asarray, cumprod, ndarray
-from matplotlib.dates import date2num, YearLocator
-from matplotlib.pyplot import xlim, subplots, figure, gca, gcf, savefig, clf
+#from matplotlib.dates import date2num, YearLocator
+#from matplotlib.pyplot import xlim, subplots, figure, gca, gcf, savefig, clf
 
 DATETIME_FORMAT = "%Y-%m-%d"
-DEFAULT_START_DATE = datetime.datetime(1990, 1, 1)
+DEFAULT_START_DATE = datetime.datetime(2021, 1, 1)
 DEFAULT_END_DATE = datetime.datetime(2021, 5, 31)
 # Adjust input and output directories as necessary
 INPUT_DATA_DIR = "."
@@ -174,12 +174,13 @@ def download_data_from_yahoo_finance(sym):
     @rtype: None
     """
     d1 = DEFAULT_START_DATE
-    d2 = (symbol_details_dict().get(sym).get("end_date") or DEFAULT_END_DATE) + datetime.timedelta(days=1)
+    d2 = DEFAULT_END_DATE
     url_params = dict(interval="1d", events="history",
                       period1=int(time.mktime((d1.year, d1.month, d1.day, 0, 0, 0, 0, 0, 0))),
                       period2=int(time.mktime((d2.year, d2.month, d2.day, 0, 0, 0, 0, 0, 0))))
     my_url = ("https://query1.finance.yahoo.com/v7/finance/download/%s?" % urllib.quote(sym)
               ) + urllib.urlencode(url_params)
+    print(my_url.decode('utf-8'))
     r = requests.get(my_url)
     file(get_data_filename(sym), "w").write(r.content)
     # If we will be downloading multiple files from Yahoo! Finance, let's not be obnoxious about it.
@@ -327,133 +328,142 @@ def get_plot_data(sym):
     returns_overnight, returns_intraday = compute_returns_overnight_intraday(price_open, price_close, price_close_adj,
                                                                              dates_datetime)
 
-    return dates_datetime, returns_overnight, returns_intraday
+    #ax.plot_date(dates_datenum[1:], (cumprod(returns_overnight + 1) - 1) * 100, fmt='-b', linewidth=1.5)
+    #ax.plot_date(dates_datenum, (cumprod(returns_intraday + 1) - 1) * 100, fmt='-g', linewidth=1.5)
+    with open(sym + 'o.csv') as f:
+        for d, i, o in zip(dates_datenum[1:], (cumprod(returns_intraday + 1) - 1)[1:], cumprod(returns_overnight + 1) - 1):
+            f.write(d,i,o,'\n')
 
+    #return dates_datetime, returns_overnight, returns_intraday
+
+
+if __name__ == "__main__":
+    get_plot_data('SPY')
 
 ##############################################################################################################
 # Make plots
 ##############################################################################################################
 
-def make_one_intraday_overnight_return_plot(plot_data, ax):
-    """
-    Draw a plot of cumulative returns.
-
-    @param plot_data: (dates_datetime, returns_overnight, returns_intraday)
-    @type plot_data: (list[datetime.datetime], ndarray, ndarray)
-    @type ax: matplotlib.axes._subplots.AxesSubplot
-    """
-    dates_datetime, returns_overnight, returns_intraday = plot_data
-
-    # Draw the lines
-    ax.margins(x=0, y=0)
-    dates_datenum = map(date2num, dates_datetime)
-    ax.plot_date(dates_datenum[1:], (cumprod(returns_overnight + 1) - 1) * 100, fmt='-b', linewidth=1.5)
-    ax.plot_date(dates_datenum, (cumprod(returns_intraday + 1) - 1) * 100, fmt='-g', linewidth=1.5)
-
-    # Add yticks on the right edge of the plot.
-    ytick_right_x = xlim()[0] + (xlim()[-1] - xlim()[0]) * 1.005
-    todays_value_overnight = ((cumprod(returns_overnight + 1) - 1) * 100)[-1]
-    todays_value_intraday = ((cumprod(returns_intraday + 1) - 1) * 100)[-1]
-    ax.text(ytick_right_x, todays_value_overnight, format_cumulative_return_as_string(todays_value_overnight),
-            verticalalignment="center")
-    ax.text(ytick_right_x, todays_value_intraday,
-            (" " if todays_value_intraday < 0 else "") + format_cumulative_return_as_string(todays_value_intraday),
-            verticalalignment="center")
-
-    # Set yticks on the left side of the plot.
-    ax.set_yticks([0])
-    ax.set_yticklabels([0])
-    ax.set_ylim(-100)
-
-
-def plot_all_suspicious_index_returns_one_plot():
-    """
-    Make Figure 1 of Strikingly Suspicious Overnight and Intraday Return Patterns.
-    """
-    symbols_to_plot = ("SPY        ^IXIC       XIU.TO "
-                       "STW.AX     EWZ         EWW "
-                       "ISFU.L     ^FCHI       ^GDAXI "
-                       "^AEX       OBXEDNB.OL  IMIB.MI "
-                       "^TA125.TA  ^NSEI       ^BSESN "
-                       "ES3.SI     ^KS11       ^TWII "
-                       "^N225      ^HSI        000001.SS").split()
-
-    # Draw twenty-one plots.
-    clf()
-    n_rows, n_cols = 7, 3
-    fig, axes = subplots(num=1, nrows=n_rows, ncols=n_cols, sharex=True)
-    every_five_years = YearLocator(5)
-    for i_s, sym in enumerate(symbols_to_plot):
-        sym_details = symbol_details_dict().get(sym)
-        ax = axes[(i_s // n_cols), (i_s % n_cols)]
-        plot_data = get_plot_data(sym)
-        make_one_intraday_overnight_return_plot(plot_data, ax)
-        # ticks on the x axis every 5 years
-        ax.xaxis.set_major_locator(every_five_years)
-        # label the plot
-        ax.text(0.02, 0.98, sym_details.get("country") + "\n" + sym_details.get("name"),
-                transform=ax.transAxes, horizontalalignment="left", verticalalignment="top", fontsize="large")
-
-    # Make sure the horizontal axis goes from DEFAULT_START_DATE to DEFAULT_END_DATE.
-    axes[-1, -1].plot_date([date2num(DEFAULT_START_DATE), date2num(DEFAULT_END_DATE)], [0, 0], fmt='w', alpha=0)
-    # Add figure title and legend.
-    axes[0, 0].legend(("overnight", "intraday"), loc='upper left', bbox_to_anchor=(0.00, 0.80))
-    fig.text(0.52, 0.90, "Overnight and Intraday Returns to Major Stock Market Indices",
-             horizontalalignment="center", verticalalignment="center", transform=fig.transFigure, fontsize="x-large")
-    fig.set_size_inches(15.32, 19, forward=True)
-    if OUTPUT_PLOT_DIR:
-        desired_plot_formats = set("jpg png pdf".split())
-        supported_plot_formats = set(gcf().canvas.get_supported_filetypes())
-        for plot_format in desired_plot_formats.intersection(supported_plot_formats):
-            savefig(os.path.join(OUTPUT_PLOT_DIR, "suspicious_index_returns.%s" % plot_format),
-                    bbox_inches="tight", dpi=300)
-        savefig(os.path.join(OUTPUT_PLOT_DIR, "suspicious_index_returns_144dpi.png"), bbox_inches="tight", dpi=144)
-
-
-def make_one_intraday_overnight_return_plot_standalone(sym):
-    """
-    Draw a plot of cumulative returns for the symbol sym.
-
-    @type sym: str
-    """
-    # Get the data.
-    plot_data = get_plot_data(sym)
-
-    # Make the plot.
-    fig = figure(1)
-    ax = gca()
-    make_one_intraday_overnight_return_plot(plot_data, ax)
-
-    # Add finishing touches.
-    ax.legend(("overnight", "intraday"), loc='upper left', bbox_to_anchor=(0.00, 1.00), fontsize="large")
-    sym_details = symbol_details_dict().get(sym)
-    fig.text(0.52, 0.90, (sym_details.get("name") + " Overnight and Intraday Returns"),
-             horizontalalignment="center", verticalalignment="bottom", transform=fig.transFigure, fontsize="x-large")
-    fig.set_size_inches(8.0, 4.2, forward=True)
-    if OUTPUT_PLOT_DIR:
-        s = (sym_details.get("short_name") or sym_details.get("name")).lower()
-        if len(s) > 20:
-            s = sym.lower()
-        s = re.sub("[ &^]", "", s)
-        savefig(os.path.join(OUTPUT_PLOT_DIR, "suspicious_returns_%s.pdf" % s), bbox_inches="tight")
-
-
-def make_all_standalone_intraday_overnight_return_plots():
-    """
-    Make a standalone overnight vs. intraday plot for the S&P 500 index.  Do the same for the NASDAQ, TSX 60, etc.
-    """
-    symbols_to_plot = ("SPY        ^IXIC       XIU.TO "
-                       "STW.AX     EWZ         EWW "
-                       "ISFU.L     ^FCHI       ^GDAXI "
-                       "^AEX       OBXEDNB.OL  IMIB.MI "
-                       "^TA125.TA  ^NSEI       ^BSESN "
-                       "ES3.SI     ^KS11       ^TWII "
-                       "^N225      ^HSI        000001.SS "
-                       "IWO        VBR").split()
-    for sym in symbols_to_plot:
-        clf()
-        make_one_intraday_overnight_return_plot_standalone(sym)
-
-
-if __name__ == "__main__":
-    plot_all_suspicious_index_returns_one_plot()
+#def make_one_intraday_overnight_return_plot(plot_data, ax):
+#    """
+#    Draw a plot of cumulative returns.
+#
+#    @param plot_data: (dates_datetime, returns_overnight, returns_intraday)
+#    @type plot_data: (list[datetime.datetime], ndarray, ndarray)
+#    @type ax: matplotlib.axes._subplots.AxesSubplot
+#    """
+#    dates_datetime, returns_overnight, returns_intraday = plot_data
+#
+#    # Draw the lines
+#    ax.margins(x=0, y=0)
+#    dates_datenum = map(date2num, dates_datetime)
+#    ax.plot_date(dates_datenum[1:], (cumprod(returns_overnight + 1) - 1) * 100, fmt='-b', linewidth=1.5)
+#    ax.plot_date(dates_datenum, (cumprod(returns_intraday + 1) - 1) * 100, fmt='-g', linewidth=1.5)
+#
+#    # Add yticks on the right edge of the plot.
+#    ytick_right_x = xlim()[0] + (xlim()[-1] - xlim()[0]) * 1.005
+#    todays_value_overnight = ((cumprod(returns_overnight + 1) - 1) * 100)[-1]
+#    todays_value_intraday = ((cumprod(returns_intraday + 1) - 1) * 100)[-1]
+#    ax.text(ytick_right_x, todays_value_overnight, format_cumulative_return_as_string(todays_value_overnight),
+#            verticalalignment="center")
+#    ax.text(ytick_right_x, todays_value_intraday,
+#            (" " if todays_value_intraday < 0 else "") + format_cumulative_return_as_string(todays_value_intraday),
+#            verticalalignment="center")
+#
+#    # Set yticks on the left side of the plot.
+#    ax.set_yticks([0])
+#    ax.set_yticklabels([0])
+#    ax.set_ylim(-100)
+#
+#
+#def plot_all_suspicious_index_returns_one_plot():
+#    """
+#    Make Figure 1 of Strikingly Suspicious Overnight and Intraday Return Patterns.
+#    """
+#    symbols_to_plot = ("SPY        ^IXIC       XIU.TO "
+#                       "STW.AX     EWZ         EWW "
+#                       "ISFU.L     ^FCHI       ^GDAXI "
+#                       "^AEX       OBXEDNB.OL  IMIB.MI "
+#                       "^TA125.TA  ^NSEI       ^BSESN "
+#                       "ES3.SI     ^KS11       ^TWII "
+#                       "^N225      ^HSI        000001.SS").split()
+#
+#    # Draw twenty-one plots.
+#    clf()
+#    n_rows, n_cols = 7, 3
+#    fig, axes = subplots(num=1, nrows=n_rows, ncols=n_cols, sharex=True)
+#    every_five_years = YearLocator(5)
+#    for i_s, sym in enumerate(symbols_to_plot):
+#        sym_details = symbol_details_dict().get(sym)
+#        ax = axes[(i_s // n_cols), (i_s % n_cols)]
+#        plot_data = get_plot_data(sym)
+#        make_one_intraday_overnight_return_plot(plot_data, ax)
+#        # ticks on the x axis every 5 years
+#        ax.xaxis.set_major_locator(every_five_years)
+#        # label the plot
+#        ax.text(0.02, 0.98, sym_details.get("country") + "\n" + sym_details.get("name"),
+#                transform=ax.transAxes, horizontalalignment="left", verticalalignment="top", fontsize="large")
+#
+#    # Make sure the horizontal axis goes from DEFAULT_START_DATE to DEFAULT_END_DATE.
+#    axes[-1, -1].plot_date([date2num(DEFAULT_START_DATE), date2num(DEFAULT_END_DATE)], [0, 0], fmt='w', alpha=0)
+#    # Add figure title and legend.
+#    axes[0, 0].legend(("overnight", "intraday"), loc='upper left', bbox_to_anchor=(0.00, 0.80))
+#    fig.text(0.52, 0.90, "Overnight and Intraday Returns to Major Stock Market Indices",
+#             horizontalalignment="center", verticalalignment="center", transform=fig.transFigure, fontsize="x-large")
+#    fig.set_size_inches(15.32, 19, forward=True)
+#    if OUTPUT_PLOT_DIR:
+#        desired_plot_formats = set("jpg png pdf".split())
+#        supported_plot_formats = set(gcf().canvas.get_supported_filetypes())
+#        for plot_format in desired_plot_formats.intersection(supported_plot_formats):
+#            savefig(os.path.join(OUTPUT_PLOT_DIR, "suspicious_index_returns.%s" % plot_format),
+#                    bbox_inches="tight", dpi=300)
+#        savefig(os.path.join(OUTPUT_PLOT_DIR, "suspicious_index_returns_144dpi.png"), bbox_inches="tight", dpi=144)
+#
+#
+#def make_one_intraday_overnight_return_plot_standalone(sym):
+#    """
+#    Draw a plot of cumulative returns for the symbol sym.
+#
+#    @type sym: str
+#    """
+#    # Get the data.
+#    plot_data = get_plot_data(sym)
+#
+#    # Make the plot.
+#    fig = figure(1)
+#    ax = gca()
+#    make_one_intraday_overnight_return_plot(plot_data, ax)
+#
+#    # Add finishing touches.
+#    ax.legend(("overnight", "intraday"), loc='upper left', bbox_to_anchor=(0.00, 1.00), fontsize="large")
+#    sym_details = symbol_details_dict().get(sym)
+#    fig.text(0.52, 0.90, (sym_details.get("name") + " Overnight and Intraday Returns"),
+#             horizontalalignment="center", verticalalignment="bottom", transform=fig.transFigure, fontsize="x-large")
+#    fig.set_size_inches(8.0, 4.2, forward=True)
+#    if OUTPUT_PLOT_DIR:
+#        s = (sym_details.get("short_name") or sym_details.get("name")).lower()
+#        if len(s) > 20:
+#            s = sym.lower()
+#        s = re.sub("[ &^]", "", s)
+#        savefig(os.path.join(OUTPUT_PLOT_DIR, "suspicious_returns_%s.pdf" % s), bbox_inches="tight")
+#
+#
+#def make_all_standalone_intraday_overnight_return_plots():
+#    """
+#    Make a standalone overnight vs. intraday plot for the S&P 500 index.  Do the same for the NASDAQ, TSX 60, etc.
+#    """
+#    symbols_to_plot = ("SPY        ^IXIC       XIU.TO "
+#                       "STW.AX     EWZ         EWW "
+#                       "ISFU.L     ^FCHI       ^GDAXI "
+#                       "^AEX       OBXEDNB.OL  IMIB.MI "
+#                       "^TA125.TA  ^NSEI       ^BSESN "
+#                       "ES3.SI     ^KS11       ^TWII "
+#                       "^N225      ^HSI        000001.SS "
+#                       "IWO        VBR").split()
+#    for sym in symbols_to_plot:
+#        clf()
+#        make_one_intraday_overnight_return_plot_standalone(sym)
+#
+#
+#if __name__ == "__main__":
+#    plot_all_suspicious_index_returns_one_plot()

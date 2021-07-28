@@ -5,7 +5,6 @@
 
 # User-specific files
 *.suo
-*.user
 *.userosscache
 *.sln.docstates
 
@@ -286,11 +285,3 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
-/pugixml-1.11/docs
-/pugixml-1.11/scripts/nuget
-/pugixml-1.11/scripts/pugixml.xcodeproj
-/pugixml-1.11/scripts/natvis
-/pugixml-1.11/scripts
-/pugixml-1.11/out/build/x64-Debug
-/tmp/g.txt
-/tmp

@@ -48,6 +48,46 @@ LPOPER WINAPI xll_range_get(HANDLEX h)
 	return h_.ptr();
 }
 
+AddIn xai_range_expand(Macro("xll_range_expand", "XLL.RANGE.EXPAND"));
+int WINAPI xll_range_expand()
+{
+#pragma XLLEXPORT
+	try {
+		OPER activeCell = Excel(xlfActiveCell);
+		OPER cellHandle = Excel(xlCoerce, activeCell);
+		ensure(cellHandle.is_num());
+		handle<OPER> h_(cellHandle.as_num());
+		ensure(h_);
+		OPER currentArray = Excel(xlcSelectSpecial, OPER(6));
+		OPER ul = Excel(xlfOffset, currentArray, OPER(0), OPER(1),
+			Excel(xlfRows, *h_), Excel(xlfColumns, *h_));
+		Excel(xlSet, ul, *h_);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+AddIn xai_range_delete(Macro("xll_range_delete", "XLL.RANGE.DELETE"));
+int WINAPI xll_range_delete()
+{
+#pragma XLLEXPORT
+	try {
+		Excel(xlcClear, OPER(1)); // all
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 AddIn xai_range_index(
 	Function(XLL_LPOPER, "xll_range_index", "RANGE.INDEX")
 	.Arguments({

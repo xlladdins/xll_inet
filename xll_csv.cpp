@@ -4,7 +4,7 @@
 using namespace xll;
 
 #define XLTYPE_TOPIC "https://support.microsoft.com/en-us/office/type-function-45b4e688-4bc3-48b3-a105-ffa892995899"
-#define X(a, b, c) XLL_CONST(WORD, XLTYPE_##b, a, c, "XLL", XLTYPE_TOPIC)
+#define X(a, b, c) XLL_CONST(LONG, XLTYPE##b, a, c, "XLL", XLTYPE_TOPIC)
 XLTYPE(X)
 #undef XLTYPE_TOPIC
 #undef X
@@ -57,7 +57,14 @@ LPOPER WINAPI xll_xltype_convert(LPOPER po, LPOPER ptype)
 
 		o = *po; // todo: operate on handle and return handle
 
-		if (po->rows() > 1 and po->columns() != 1) {
+		if (po->rows() == 1) {
+			ensure(o.size() == ptype->size());
+
+			for (unsigned i = 0; i < o.size(); ++i) {
+				parse::convert(o[i], (*ptype)[i]);
+			}
+		}
+		else {
 			// 2-d range
 			ensure(o.columns() == size(*ptype));
 
@@ -65,13 +72,6 @@ LPOPER WINAPI xll_xltype_convert(LPOPER po, LPOPER ptype)
 				for (unsigned j = 0; j < o.columns(); ++j) {
 					parse::convert(o(i, j), (*ptype)[j]);
 				}
-			}
-		}
-		else {
-			ensure(o.size() == ptype->size());
-
-			for (unsigned i = 0; i < o.size(); ++i) {
-				parse::convert(o[i], (*ptype)[i]);
 			}
 		}
 	}
@@ -124,6 +124,44 @@ LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e)
 			
 			o = csv::parse<XLOPERX, xchar>(v, rs, fs, e);
 		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &o;
+}
+
+AddIn xai_csv_parse_timeseries(
+	Function(XLL_LPOPER, "xll_csv_parse_timeseries", "CSV.PARSE.TIMESERIES")
+	.Arguments({
+		Arg(XLL_HANDLEX, "view", "is handle to a view."),
+		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
+		Arg(XLL_CSTRING, "_fs", "is an optional field separator. Default is comma ','."),
+		Arg(XLL_CSTRING, "_esc", "is an optional escape character. Default is backslash '\\'."),
+		})
+	.FunctionHelp("Parse view into a timeseries.")
+	.Category("CSV")
+	.Documentation(R"xyzyx(
+Convert comma separated values to a range. First column must be a date.
+)xyzyx")
+);
+LPOPER WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _e)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	o = ErrNA;
+	try {
+		handle<fms::view<char>> h_(csv);
+		ensure(h_);
+
+		char rs = static_cast<char>(*_rs ? *_rs : '\n');
+		char fs = static_cast<char>(*_fs ? *_fs : ',');
+		char e = static_cast<char>(*_e ? *_e : '\\');
+		auto v = fms::view<char>(h_->buf, h_->len);
+
+		o = csv::parse_timeseries<XLOPERX>(v, rs, fs, e);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

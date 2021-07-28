@@ -330,6 +330,7 @@ LPOPER WINAPI xll_json_index(LPOPER pjson, LPOPER pindex)
 	return &o;
 }
 
+
 #ifdef _DEBUG
 
 Auto<OpenAfter> xaoa_json_test([]() {
