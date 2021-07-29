@@ -12,6 +12,64 @@ XLTYPE(X)
 using xcstr = xll::traits<XLOPERX>::xcstr;
 using xchar = xll::traits<XLOPERX>::xchar;
 
+AddIn xai_csf3(Macro("xll_csf3", "C.S.F3").Documentation(R"(
+Like <code>Ctrl-Shift-F3</code> this macro defines names using
+selected text. It looks for a handle in the cell below
+the first item in the selected range and defines names
+corresponding to the columns in the array or range
+associated with the handle.
+)"));
+int WINAPI xll_csf3()
+{
+#pragma XLLEXPORT
+	try {
+		OPER sel = Excel(xlfSelection);
+		OPER names = Excel(xlCoerce, sel);
+
+		OPER cell = Excel(xlfOffset, sel, OPER(1), OPER(0), OPER(1), OPER(1));
+		cell = Excel(xlfAbsref, OPER(REF(0, 0)), cell);
+		OPER handlex = Excel(xlCoerce, cell);
+		ensure(handlex.is_num());
+	
+		// !!!get.name(cell) and delete name
+		// define unique name for handlex
+		OPER name(std::tmpnam(nullptr));
+		name = name.safe();
+		Excel(xlcDefineName, name, cell, OPER(1));
+
+		OPER index;
+		{
+			handle<FPX> a_(handlex.as_num());
+			if (a_) {
+				index = OPER("=array.index(") & name & OPER(",,");
+			}
+		}
+		if (!index) {
+			handle<OPER> r_(handlex.as_num());
+			if (r_) {
+				index = OPER("=range.index(") & name & OPER(",,");
+			}
+		}
+		ensure(index);
+
+		// num to text
+		auto text = [](unsigned i) {
+			return Excel(xlfText, OPER(i), OPER("0"));
+		};
+		for (unsigned i = 0; i < names.size(); ++i) {
+			OPER namei = index & text(i) & OPER(")");
+			Excel(xlcDefineName, names[i], namei, OPER(1));
+		}
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 AddIn xai_xltype(
 	Function(XLL_LONG, "xll_xltype", "XLTYPE")
 	.Arguments({
@@ -169,59 +227,59 @@ LPOPER WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr 
 
 	return &o;
 }
-/*
-AddIn xai_range_convert(
-	Function(XLL_LPOPER, "xll_range_convert", "RANGE.CONVERT")
+
+AddIn xai_array_diff(
+	Function(XLL_FPX, "xll_array_diff", "ARRAY.DIFF")
 	.Arguments({
-		Arg(XLL_LPOPER, "range", "is a range or handle to a range."),
-		Arg(XLL_LPOPER, "types", "is a one row range of conversion types."),
-		Arg(XLL_BOOL, "_header", "is an optional boolean indicating the first row is a header.")
+		Arg(XLL_FPX, "array", "is an array or handle to an array."),
+		Arg(XLL_LONG, "n", "is the number of differences to calculate.")
 		})
-	.FunctionHelp("Convert columns of range.")
-	.Category("RANGE")
-	.Documentation(R"(
-Convert columns of <code>range</code> based on index. The <code>types</code>
-should have the same size as the number of columns and contain numbers
-corresponding to <code>xltype*</code> values.
-)")
+	.FunctionHelp("Return forward (n > 0) or backward (n < 0) differences of array.")
+	.Category(CATEGORY)
+	.Documentation(R"xyzyx(
+Compute forward or backward difference of an array. The forward difference
+of array \((a_i)\) is \((a_{i+1} - a_i)\) and the backward difference is
+\((a_i - a_{i-1})\). The returned array has the same size and the
+computation. The last item in the forward difference is unchanged.
+The first item in the backward difference is unchanged.
+<p>
+The number of differences can be any integer.
+Use <code>ARRAY.DROP(ARRAY.DIFF(a,n), n)</code> to remove unchanged items.
+)xyzyx")
 );
-LPOPER WINAPI xll_range_convert(LPOPER prange, const LPOPER ptypes, BOOL header)
+_FPX* WINAPI xll_array_diff(_FPX* pa, LONG n)
 {
 #pragma XLLEXPORT
-	static OPER o;
+	unsigned na = size(*pa);
 
-	try {
-		LPOPER po = &o;
-		if (prange->is_num()) {
-			handle<OPER> h_(prange->val.num);
-			ensure(h_);
-			po = h_.ptr();
+	if (na == 1) {
+		handle<FPX> a_(pa->array[0]);
+		if (a_) {
+			pa = a_->get();
 		}
-		else {
-			o = *prange;
-		}
-		ensure(po->columns() == ptypes->size());
+	}
 
-		for (unsigned j = 0; j < po->columns(); ++j) {
-			const auto& type = (*ptypes)[j];
-			if (type) {
-				for (unsigned i = header; i < po->rows(); ++i) {
-					parse::convert((*po)(i, j), type);
-				}
+	if (n > 0) {
+		while (n != 0) {
+			for (unsigned i = 0; i < na - n; ++i) {
+				index(*pa, i) = index(*pa, i + 1) - index(*pa, i);
 			}
+			--n;
 		}
 	}
-	catch (const std::exception& ex) {
-		XLL_ERROR(ex.what());
-
-		return (LPOPER)&ErrValue;
+	else if (n < 0) {
+		while (n != 0) {
+			for (unsigned i = -n; i < na; ++i) {
+				index(*pa, i) = index(*pa, i) - index(*pa, i - 1);
+			}
+			++n;
+		}
 	}
 
-	return &o;
+	return pa;
 }
-*/
+
 #ifdef _DEBUG
 
-Auto<OpenAfter> xaoa_test_csv_parse([]() { return xll::csv::test<TCHAR>() == 0; });
 
 #endif // _DEBUG
