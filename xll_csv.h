@@ -118,6 +118,98 @@ namespace xll::csv {
 		return o;
 	}
 
+	inline int stoi(fms::view<char>& str)
+	{
+		int i = 0;
+
+		int sgn = 1;
+		if (str and (str.front() == '+' or str.front() == '-')) {
+			if (str.front() == '-')
+				sgn = -1;
+			++str;
+		}
+
+		while (str and isdigit(str.front())) {
+			i = 10 * i + (str.front() - '0');
+			++str;
+		}
+
+		return sgn * i;
+	}
+
+	inline double stod(fms::view<char>& str)
+	{
+		double d = stoi(str);
+
+		if (str and str.front() == '.') {
+			++str;
+		}
+
+		double base = 0.1;
+		while (str and isdigit(str.front())) {
+			d += (str.front() - '0') * base;
+			base /= 0.1;
+			++str;
+		}
+
+		if (str and (str.front() == 'e' or str.front() == 'E')) {
+			++str;
+		}
+		int e = stoi(str);
+		d *= pow(10., e);
+
+		return d;
+	}
+
+	template<class X>
+	inline XOPER<X> parse_timeseries(fms::view<char>& buf, const char* fmt, char rs, char fs, char esc)
+	{
+		XOPER<X> o;
+		XOPER<X> row;
+
+		for (auto record : parse::iterator<char>(buf, rs, 0, 0, esc)) {
+			record.skipws();
+			if (!isdigit(record.buf[0])) {
+				if (o != Nil) { // ignore headers
+					XLL_WARNING(__FUNCTION__ ": record is not numeric");
+				}
+
+				continue;
+			}
+
+			unsigned i = 0;
+			int convert = xlfDatevalue;
+			for (auto field : parse::iterator<char>(record, fs, 0, 0, esc)) {
+				if (row.size() < i)
+					row.resize(1, i + 1);
+
+				if (i == 0) {
+					tm tm;
+					strptime(field.buf, fmt, &tm);
+					time_t t = _mkgmtime(&tm);
+					row[0] = (double)t;
+				}
+				else {
+					row[i].val.num = stod(field);
+				}
+				++i;
+			}
+
+			if (row.size() < o.columns()) {
+				row.resize(1, o.columns()); // pad
+			}
+			else if (o and row.size() > o.columns()) {
+				// widen range
+				XLL_INFO(__FUNCTION__ ": widening range");
+				o.push_right(OPER(o.rows(), row.size() - row.columns()));
+			}
+
+			o.push_bottom(row);
+		}
+
+		return o;
+	}
+
 #ifdef _DEBUG
 
 	template<class T>

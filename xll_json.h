@@ -112,7 +112,7 @@ namespace xll::json {
 	template<class X>
 	inline unsigned match(const XOPER<X>& o, const XOPER<X>& k)
 	{
-		auto i = Excel(xlfMatch, k, keys(o), XOPER<X>(0)); // exact
+		auto i = Excel(xlfMatch, k[0], keys(o), XOPER<X>(0)); // exact
 		ensure(i.is_num());
 
 		return static_cast<unsigned>(i.val.num - 1);

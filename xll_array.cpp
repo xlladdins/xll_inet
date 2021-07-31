@@ -1,4 +1,5 @@
 // xll_array.cpp - array functions
+#include <numeric>
 #include "xll/xll/xll.h"
 
 #ifndef CATEGORY
@@ -6,6 +7,8 @@
 #endif
 
 using namespace xll;
+
+using xcstr = traits<XLOPERX>::xcstr;
 
 AddIn xai_array_(
 	Function(XLL_HANDLEX, "xll_array_", "\\ARRAY")
@@ -318,22 +321,16 @@ AddIn xai_array_diff(
 	Function(XLL_FPX, "xll_array_diff", "ARRAY.DIFF")
 	.Arguments({
 		Arg(XLL_FPX, "array", "is an array or handle to an array."),
-		Arg(XLL_LONG, "n", "is the number of differences to calculate.")
+		Arg(XLL_CSTRING, "_op", "is a binary operation.")
 		})
-	.FunctionHelp("Return forward (n > 0) or backward (n < 0) differences of array.")
+	.FunctionHelp("Return adjacent differences of array.")
 	.Category(CATEGORY)
 	.Documentation(R"xyzyx(
-Compute forward or backward difference of an array. The forward difference
-of array \((a_i)\) is \((a_{i+1} - a_i)\) and the backward difference is
-\((a_i - a_{i-1})\). The returned array has the same size and the
-computation. The last item in the forward difference is unchanged.
-The first item in the backward difference is unchanged.
-<p>
-The number of differences can be any integer.
-Use <code>ARRAY.DROP(ARRAY.DIFF(a,n), n)</code> to remove unchanged items.
+Call <code>std::adjacent_difference</code> using <code>op</code>.
+If <op> is missing use subtraction ("-").
 )xyzyx")
 );
-_FPX* WINAPI xll_array_diff(_FPX* pa, LONG n)
+_FPX* WINAPI xll_array_diff(_FPX* pa, xcstr op)
 {
 #pragma XLLEXPORT
 	unsigned na = size(*pa);
@@ -345,20 +342,48 @@ _FPX* WINAPI xll_array_diff(_FPX* pa, LONG n)
 		}
 	}
 
-	if (n > 0) {
-		while (n != 0) {
-			for (unsigned i = 0; i < na - n; ++i) {
-				index(*pa, i) = index(*pa, i + 1) - index(*pa, i);
-			}
-			--n;
+	if (*op == 0 or *op == '-') {
+		std::adjacent_difference(begin(*pa), end(*pa), begin(*pa));
+	}
+	if (*op == '/') {
+		std::adjacent_difference(begin(*pa), end(*pa), begin(*pa), std::divides<double>{});
+	}
+
+	return pa;
+}
+
+AddIn xai_array_scan(
+	Function(XLL_FPX, "xll_array_scan", "ARRAY.SCAN")
+	.Arguments({
+		Arg(XLL_FPX, "array", "is an array or handle to an array."),
+		Arg(XLL_CSTRING, "_op", "is a binary operation")
+		})
+	.FunctionHelp("Return right fold of array using op.")
+	.Category(CATEGORY)
+	.Documentation(R"xyzyx(
+If <op> is missing use addition ("+").
+)xyzyx")
+);
+_FPX* WINAPI xll_array_scan(_FPX* pa, xcstr op)
+{
+#pragma XLLEXPORT
+	unsigned na = size(*pa);
+
+	if (na == 1) {
+		handle<FPX> a_(pa->array[0]);
+		if (a_) {
+			pa = a_->get();
 		}
 	}
-	else if (n < 0) {
-		while (n != 0) {
-			for (unsigned i = -n; i < na; ++i) {
-				index(*pa, i) = index(*pa, i) - index(*pa, i - 1);
-			}
-			++n;
+
+	if (*op == 0 or *op == '+') {
+		for (unsigned i = 1; i < size(*pa); ++i) {
+			pa->array[i] = pa->array[i - 1] + pa->array[i];
+		}
+	}
+	if (*op == '*') {
+		for (unsigned i = 1; i < size(*pa); ++i) {
+			pa->array[i] = pa->array[i - 1] * pa->array[i];
 		}
 	}
 
@@ -369,7 +394,6 @@ _FPX* WINAPI xll_array_diff(_FPX* pa, LONG n)
 
 
 #endif // _DEBUG
-
 #if 0
 
 

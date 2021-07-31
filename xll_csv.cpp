@@ -12,63 +12,6 @@ XLTYPE(X)
 using xcstr = xll::traits<XLOPERX>::xcstr;
 using xchar = xll::traits<XLOPERX>::xchar;
 
-AddIn xai_csf3(Macro("xll_csf3", "C.S.F3").Documentation(R"(
-Like <code>Ctrl-Shift-F3</code> this macro defines names using
-selected text. It looks for a handle in the cell below
-the first item in the selected range and defines names
-corresponding to the columns in the array or range
-associated with the handle.
-)"));
-int WINAPI xll_csf3()
-{
-#pragma XLLEXPORT
-	try {
-		OPER sel = Excel(xlfSelection);
-		OPER names = Excel(xlCoerce, sel);
-
-		OPER cell = Excel(xlfOffset, sel, OPER(1), OPER(0), OPER(1), OPER(1));
-		cell = Excel(xlfAbsref, OPER(REF(0, 0)), cell);
-		OPER handlex = Excel(xlCoerce, cell);
-		ensure(handlex.is_num());
-	
-		// !!!get.name(cell) and delete name
-		// define unique name for handlex
-		OPER name(std::tmpnam(nullptr));
-		name = name.safe();
-		Excel(xlcDefineName, name, cell, OPER(1));
-
-		OPER index;
-		{
-			handle<FPX> a_(handlex.as_num());
-			if (a_) {
-				index = OPER("=array.index(") & name & OPER(",,");
-			}
-		}
-		if (!index) {
-			handle<OPER> r_(handlex.as_num());
-			if (r_) {
-				index = OPER("=range.index(") & name & OPER(",,");
-			}
-		}
-		ensure(index);
-
-		// num to text
-		auto text = [](unsigned i) {
-			return Excel(xlfText, OPER(i), OPER("0"));
-		};
-		for (unsigned i = 0; i < names.size(); ++i) {
-			OPER namei = index & text(i) & OPER(")");
-			Excel(xlcDefineName, names[i], namei, OPER(1));
-		}
-	}
-	catch (const std::exception& ex) {
-		XLL_ERROR(ex.what());
-
-		return FALSE;
-	}
-
-	return TRUE;
-}
 
 AddIn xai_xltype(
 	Function(XLL_LONG, "xll_xltype", "XLTYPE")
