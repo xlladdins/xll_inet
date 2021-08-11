@@ -193,9 +193,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="fms_ntp.h" />
-    <ClInclude Include="ISO8601.h" />
     <ClInclude Include="fms_PnL.h" />
-    <ClInclude Include="xll_csv.h" />
     <ClInclude Include="xll_inet.h" />
     <ClInclude Include="libxml2.h" />
     <ClInclude Include="xll_parse.h" />

@@ -1,5 +1,5 @@
 // xll_csv.cpp - Parse CSV strings
-#include "xll_csv.h"
+#include "xll_parse.h"
 
 using namespace xll;
 
@@ -86,10 +86,10 @@ LPOPER WINAPI xll_xltype_convert(LPOPER po, LPOPER ptype)
 AddIn xai_csv_parse(
 	Function(XLL_LPOPER, "xll_csv_parse", "CSV.PARSE")
 	.Arguments({
-		Arg(XLL_LPOPER, "csv", "is a string of comma separated values or handle."),
-		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
-		Arg(XLL_CSTRING, "_fs", "is an optional field separator. Default is comma ','."),
-		Arg(XLL_CSTRING, "_esc", "is an optional escape character. Default is backslash '\\'."),
+		Arg(XLL_HANDLEX, "csv", "is a handle to a string of comma separated values."),
+		Arg(XLL_CSTRING4, "_rs", "is an optional record separator. Default is newline '\\n'."),
+		Arg(XLL_CSTRING4, "_fs", "is an optional field separator. Default is comma ','."),
+		Arg(XLL_CSTRING4, "_esc", "is an optional escape character. Default is backslash '\\'."),
 		})
 	.FunctionHelp("Parse CSV string into a range.")
 	.Category("CSV")
@@ -97,44 +97,47 @@ AddIn xai_csv_parse(
 Convert comma separated values to a range. 
 )xyzyx")
 );
-LPOPER WINAPI xll_csv_parse(LPOPER pcsv, xcstr _rs, xcstr _fs, xcstr _e)
+LPOPER WINAPI xll_csv_parse(HANDLEX hcsv, const char* _rs, const char* _fs, const char* _e)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
-	o = ErrNA;
 	try {
-		if (pcsv->is_num()) {
-			handle<fms::view<char>> h_(pcsv->as_num());
-			ensure(h_);
+		handle<fms::view<char>> h_(hcsv);
+		ensure(h_);
 
-			char rs = static_cast<char>(*_rs ? *_rs : '\n');
-			char fs = static_cast<char>(*_fs ? *_fs : ',');
-			char e = static_cast<char>(*_e ? *_e : '\\');
-			auto v = fms::view<char>(h_->buf, h_->len);
+		char rs = *_rs ? *_rs : '\n';
+		char fs = *_fs ? *_fs : ',';
+		char e = *_e ? *_e : '\\';
+		auto v = fms::char_view(h_->buf, h_->len);
 
-			o = csv::parse<XLOPERX, char>(v, rs, fs, e);
-		}
-		else {
-			ensure(pcsv->is_str());
-
-			xchar rs = *_rs ? *_rs : _T('\n');
-			xchar fs = *_fs ? *_fs : _T(',');
-			xchar e = *_e ? *_e : _T('\\');
-			auto v = fms::view<xchar>(pcsv->val.str + 1, pcsv->val.str[0]);
-			
-			o = csv::parse<XLOPERX, xchar>(v, rs, fs, e);
+		unsigned r = 0;
+		unsigned c = 0;
+		for (auto record : fms::parse::splitable(v, rs, '"', '"', e)) {
+			if (r == 0) {
+				c = static_cast<unsigned>(std::distance(record.begin(), record.end()));
+			}
+			o.resize(r + 1, c);
+			unsigned i = 0;
+			for (auto field : fms::parse::splitable(record, fs, '"', '"', e)) {
+				ensure(i < c);
+				o(r, i) = OPER(field.buf, field.len);
+				++i;
+			}
+			++r;
 		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
+
+		o = ErrNA;
 	}
 
 	return &o;
 }
 
 AddIn xai_csv_parse_timeseries(
-	Function(XLL_LPOPER, "xll_csv_parse_timeseries", "CSV.PARSE.TIMESERIES")
+	Function(XLL_FPX, "xll_csv_parse_timeseries", "CSV.PARSE.TIMESERIES")
 	.Arguments({
 		Arg(XLL_HANDLEX, "view", "is handle to a view."),
 		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
@@ -147,12 +150,11 @@ AddIn xai_csv_parse_timeseries(
 Convert comma separated values to a range. First column must be a date.
 )xyzyx")
 );
-LPOPER WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _e)
+_FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _e)
 {
 #pragma XLLEXPORT
-	static OPER o;
+	static FPX o;
 
-	o = ErrNA;
 	try {
 		handle<fms::view<char>> h_(csv);
 		ensure(h_);
@@ -160,14 +162,53 @@ LPOPER WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr 
 		char rs = static_cast<char>(*_rs ? *_rs : '\n');
 		char fs = static_cast<char>(*_fs ? *_fs : ',');
 		char e = static_cast<char>(*_e ? *_e : '\\');
-		auto v = fms::view<char>(h_->buf, h_->len);
+		auto v = fms::char_view(h_->buf, h_->len);
 
-		o = csv::parse_timeseries<XLOPERX>(v, rs, fs, e);
+		unsigned r = 0;
+		unsigned c = 0;
+		for (auto record : fms::parse::splitable(v, rs, '"', '"', e)) {
+			if (r == 0) {
+				c = static_cast<unsigned>(std::distance(record.begin(), record.end()));
+			}
+
+			if (!std::isdigit(record.front())) {
+				continue; // skip character data
+			}
+
+			o.resize(r + 1, c);
+			unsigned i = 0;
+			for (auto field : fms::parse::splitable(record, fs, '"', '"', e)) {
+				double x;
+				if (i == 0) {
+					auto [y, m, d] = fms::parse::to_ymd(field);
+					x = Excel(xlfDate, OPER(y), OPER(m), OPER(d)).as_num();
+					ensure(!field.is_error());
+					if (field and field.drop(1)) {
+						auto [hh, mm, ss] = fms::parse::to_hms(field);
+						ensure(!field.is_error());
+						if (field) {
+							auto [ho, mo] = fms::parse::to_off(field);
+							ensure(!field.is_error());
+							ensure(!field);
+							hh += ho;
+							mm += mo;
+						}
+						x += Excel(xlfTime, OPER(hh), OPER(mm), OPER(ss)).as_num();
+					}
+				}
+				else {
+					x = fms::parse::to<double>(field);
+				}
+				o(r, i) = x;
+				++i;
+			}
+			++r;
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
 	}
 
-	return &o;
+	return o.get();
 }
 
