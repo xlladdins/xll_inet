@@ -143,7 +143,7 @@ LPOPER WINAPI xll_csv_parse(HANDLEX hcsv, const char* _rs, const char* _fs, cons
 
 	return &o;
 }
-#if 0
+
 AddIn xai_csv_parse_timeseries(
 	Function(XLL_FPX, "xll_csv_parse_timeseries", "CSV.PARSE.TIMESERIES")
 	.Arguments({
@@ -170,22 +170,26 @@ _FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _
 		char rs = static_cast<char>(*_rs ? *_rs : '\n');
 		char fs = static_cast<char>(*_fs ? *_fs : ',');
 		char e = static_cast<char>(*_e ? *_e : '\\');
-		auto v = fms::char_view(h_->buf, h_->len);
+		auto v = fms::char_view<const char>(h_->buf, h_->len);
 
 		unsigned r = 0;
 		unsigned c = 0;
-		for (auto record : fms::parse::splitable(v, rs, '"', '"', e)) {
-			if (r == 0) {
-				c = static_cast<unsigned>(std::distance(record.begin(), record.end()));
-			}
-
+		auto records = fms::parse::splitable<const char>(v, rs, '"', '"', e);
+		for (auto record : records) {
 			if (!std::isdigit(record.front())) {
 				continue; // skip character data
 			}
-
-			o.resize(r + 1, c);
 			unsigned i = 0;
-			for (auto field : fms::parse::splitable(record, fs, '"', '"', e)) {
+			auto fields = fms::parse::splitable<const char>(record, fs, '"', '"', e);
+			for (auto field : fields) {
+				if (r == 0) {
+					c = static_cast<unsigned>(std::distance(fields.begin(), fields.end()));
+					o.resize(1, c);
+				}
+				else if (i == 0) {
+					o.resize(r + 1, c);
+				}
+				ensure(i < c);
 				double x;
 				if (i == 0) {
 					auto [y, m, d] = fms::parse::to_ymd(field);
@@ -215,9 +219,9 @@ _FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
+
+		o.resize(0, 0);
 	}
 
 	return o.get();
 }
-
-#endif // 0
