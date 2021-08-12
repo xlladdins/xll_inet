@@ -1,6 +1,6 @@
 // xll_inet.cpp - WinInet wrappers
 #include "xll_inet.h"
-#include "xll_parse.h"
+#include "fms_parse/win_mem_view.h"
 
 using namespace xll;
 
@@ -449,7 +449,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     HANDLEX h = INVALID_HANDLEX;
 
     try {
-        handle<fms::view<char>> h_(new win::mem_view);
+        handle<fms::view<char>> h_(new win::mem_view<char>);
         
         DWORD_PTR context = NULL;
         OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
@@ -461,7 +461,6 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
         if (!InternetQueryDataAvailable(hurl, &len, 0, 0)) {
             len = 4096; // ??? page size
         }
-        *h_->buf = 0; // buffer index when split
         char* buf = h_->buf;
         while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
             h_->len += len;
@@ -508,14 +507,14 @@ LPOPER WINAPI xll_view(HANDLEX h, LONG off, LONG len)
             v->drop(3);
         }
 
-        if (off != 0) {
-            v->drop(off);
+        if (off > v->len) {
+            off = v->len - 1;
         }
-        if (len != 0) {
-            v->take(len);
+        if (off + len > v->len) {
+            len = v->len - off - 1;
         }
 
-        result = OPER(v->buf, v->len);
+        result = OPER(v->buf + off, len);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
@@ -563,9 +562,11 @@ AddIn xai_view_drop(
         Arg(XLL_HANDLEX, "handle", "is a handle returned by \\URL.VIEW."),
         Arg(XLL_LONG, "count", "number or characters to drop from beginning (count > 0) or end (count < 0) of view"),
         })
-    .FunctionHelp("Return substring of view.")
+    .FunctionHelp("Return handle with dropped characters.")
     .Category(CATEGORY)
     .Documentation(R"xyzyx(
+Drop from the beginning if <code>count > 0</code>
+or end if <code>count < 0</code> of view.
 )xyzyx")
 );
 HANDLEX WINAPI xll_view_drop(HANDLEX h, LONG count)
@@ -575,16 +576,9 @@ HANDLEX WINAPI xll_view_drop(HANDLEX h, LONG count)
 
     try {
         handle<fms::view<char>> h_(h);
-        ensure(h_ || !"VIEW: unrecognized handle");
+        ensure(h_ || !"VIEW.DROP: unrecognized handle");
 
-        count = std::clamp(count, -(LONG)h_->len, (LONG)h_->len);
-        if (count > 0) {
-            h_->buf += count;
-            h_->len -= count;
-        }
-        else if (count < 0) {
-            h_->len += count;
-        }
+        h_->drop(count);
     }
     catch (const std::exception& ex) {
         XLL_ERROR(ex.what());
@@ -593,59 +587,6 @@ HANDLEX WINAPI xll_view_drop(HANDLEX h, LONG count)
     }
 
     return h;
-}
-
-AddIn xai_range_chop(
-    Function(XLL_LPOPER, "xll_range_chop", "RANGE.CHOP")
-    .Arguments({
-        Arg(XLL_LPOPER, "range", "is a range"),
-        Arg(XLL_LONG, "count", "is then number of things to chop."),
-        })
-        .Category("XLL")
-    .FunctionHelp("Take from the beginning (count > 0) or drop from the end (count < 0) of a range.")
-    .Documentation(R"(
-Take <code>count</code> rows from the top of <code>range</code> if <code>count > 0</code>
-or drop <code>-count</code> rows from the end of the range if <code>count < 0</code>.
-If <code>range</code> has one row then take/drop from the front/back.
-If <code>range</code> is a handle perform the function on the in-memory range
-and return the handle;
-)")
-);
-LPOPER WINAPI xll_range_chop(LPOPER prange, LONG n)
-{
-#pragma XLLEXPORT
-    if (prange->is_num()) {
-        handle<OPER> h(prange->val.num);
-        if (h and h->is_multi()) {
-            auto p = xll_range_chop(h.ptr(), n);
-            h->val.array.rows = p->val.array.rows;
-            h->val.array.columns = p->val.array.columns;
-        }
-    }
-    else if (prange->is_multi()) {
-        if (n >= 0) {
-            if (prange->val.array.rows > 1) {
-                n = std::min(n, (LONG)prange->val.array.rows);
-                prange->val.array.rows = n;
-            }
-            else {
-                n = std::min(n, (LONG)prange->val.array.columns);
-                prange->val.array.columns = n;
-            }
-        }
-        else {
-            if (prange->val.array.rows > 1) {
-                n = std::max(n, -(LONG)prange->val.array.rows);
-                prange->val.array.rows += n;
-            }
-            else {
-                n = std::max(n, -(LONG)prange->val.array.columns);
-                prange->val.array.columns += n;
-            }
-        }
-    }
-
-    return prange;
 }
 
 #if 0

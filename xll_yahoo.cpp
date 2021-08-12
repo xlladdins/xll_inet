@@ -59,7 +59,6 @@ LPOPER WINAPI xll_mktime_(double date)
 	return &t;
 }
 
-
 AddIn xai_localtime_(
 	Function(XLL_LPOPER, "xll_localtime_", "LOCALTIME")
 	.Arguments({

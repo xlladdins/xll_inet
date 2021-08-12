@@ -31,6 +31,8 @@ LONG WINAPI xll_xltype(const LPOPER po)
 	return po->xltype;
 }
 
+#if 0
+
 AddIn xai_xltype_convert(
 	Function(XLL_LPOPER, "xll_xltype_convert", "XLTYPE.CONVERT")
 	.Arguments({
@@ -82,6 +84,7 @@ LPOPER WINAPI xll_xltype_convert(LPOPER po, LPOPER ptype)
 
 	return &o;
 }
+#endif // 0
 
 AddIn xai_csv_parse(
 	Function(XLL_LPOPER, "xll_csv_parse", "CSV.PARSE")
@@ -91,7 +94,7 @@ AddIn xai_csv_parse(
 		Arg(XLL_CSTRING4, "_fs", "is an optional field separator. Default is comma ','."),
 		Arg(XLL_CSTRING4, "_esc", "is an optional escape character. Default is backslash '\\'."),
 		})
-	.FunctionHelp("Parse CSV string into a range.")
+	.FunctionHelp("Parse handle to a CSV string into a range.")
 	.Category("CSV")
 	.Documentation(R"xyzyx(
 Convert comma separated values to a range. 
@@ -109,17 +112,22 @@ LPOPER WINAPI xll_csv_parse(HANDLEX hcsv, const char* _rs, const char* _fs, cons
 		char rs = *_rs ? *_rs : '\n';
 		char fs = *_fs ? *_fs : ',';
 		char e = *_e ? *_e : '\\';
-		auto v = fms::char_view(h_->buf, h_->len);
+		auto v = fms::char_view<char>(h_->buf, h_->len);
 
 		unsigned r = 0;
 		unsigned c = 0;
-		for (auto record : fms::parse::splitable(v, rs, '"', '"', e)) {
-			if (r == 0) {
-				c = static_cast<unsigned>(std::distance(record.begin(), record.end()));
-			}
-			o.resize(r + 1, c);
+		auto records = fms::parse::splitable(v, rs, '"', '"', e);
+		for (auto record : records) {
 			unsigned i = 0;
-			for (auto field : fms::parse::splitable(record, fs, '"', '"', e)) {
+			auto fields = fms::parse::splitable(record, fs, '"', '"', e);
+			for (auto field : fields) {
+				if (r == 0) {
+					c = static_cast<unsigned>(std::distance(fields.begin(), fields.end()));
+					o.resize(1, c);
+				}
+				else if (i == 0) {
+					o.resize(r + 1, c);
+				}
 				ensure(i < c);
 				o(r, i) = OPER(field.buf, field.len);
 				++i;
@@ -135,7 +143,7 @@ LPOPER WINAPI xll_csv_parse(HANDLEX hcsv, const char* _rs, const char* _fs, cons
 
 	return &o;
 }
-
+#if 0
 AddIn xai_csv_parse_timeseries(
 	Function(XLL_FPX, "xll_csv_parse_timeseries", "CSV.PARSE.TIMESERIES")
 	.Arguments({
@@ -212,3 +220,4 @@ _FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _
 	return o.get();
 }
 
+#endif // 0
