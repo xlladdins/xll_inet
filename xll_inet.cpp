@@ -1,4 +1,5 @@
 // xll_inet.cpp - WinInet wrappers
+#include <thread>
 #include "xll_inet.h"
 #include "fms_parse/win_mem_view.h"
 
@@ -433,7 +434,25 @@ LPOPER WINAPI xll_http_query_info(HANDLEX h, LPOPER pinfo)
     return &result;
 }
 
-// \INET.READ_FILE
+// return data in a view
+void url_view(LPCTSTR url, LPOPER pheaders, LONG flags, fms::view<char>& h)
+{
+    DWORD_PTR context = NULL;
+    OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
+    head.append(headers(*pheaders));
+    Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
+    ensure(hurl || !__FUNCTION__ ": failed to open URL");
+
+    DWORD len;
+    if (!InternetQueryDataAvailable(hurl, &len, 0, 0)) {
+        len = 4096; // ??? page size
+    }
+    char* buf = h.buf;
+    while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
+        h.len += len;
+        buf += len;
+    }
+}
 
 AddIn xai_inet_read_file(
     Function(XLL_HANDLEX, "xll_inet_read_file", "\\URL.VIEW")
@@ -462,23 +481,9 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 
     try {
         handle<fms::view<char>> h_(new win::mem_view<char>);
-        
-        DWORD_PTR context = NULL;
-        OPER head = OPER("User-Agent: " USER_AGENT "\r\n");
-        head.append(headers(*pheaders));
-        Inet::HInet hurl(InternetOpenUrl(Inet::hInet, url, head.val.str + 1, head.val.str[0], flags, context));
-        ensure(hurl || !__FUNCTION__ ": failed to open URL");
- 
-        DWORD len;
-        if (!InternetQueryDataAvailable(hurl, &len, 0, 0)) {
-            len = 4096; // ??? page size
-        }
-        char* buf = h_->buf;
-        while (InternetReadFile(hurl, buf, len, &len) and len != 0) {
-            h_->len += len;
-            buf += len;
-        }
-
+  
+        url_view(url, pheaders, flags, *h_);
+  
         h = h_.get();
     }
     catch (const std::exception& ex) {
@@ -486,6 +491,41 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     }
 
     return h;
+}
+
+AddIn xai_inet_viewa(
+    Function(XLL_VOID, "xll_inet_read_file", "URL.VIEWA")
+    .Arguments({
+        Arg(XLL_CSTRING, "url", "is a URL to read."),
+        Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
+        Arg(XLL_LONG, "_flags", "are optional flags from INTERNET_FLAGS_*. Default is 0.")
+        })
+    .Asynchronous()
+    .Category(CATEGORY)
+    .FunctionHelp("Asynchronously return a handle to the string returned by url.")
+    .Documentation(R"xyzyx(
+Read all url data into memory using
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla">InternetOpenUrl</a>
+and
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile">InternetReadFile</a>.
+<p>
+Headers are specified as a two column array of keys in the first row and values in the second.
+</p>
+)xyzyx")
+);
+void WINAPI xll_inet_viewa(LPCTSTR url, LPOPER pheaders, LONG flags, LPXLOPERX phandle)
+{
+#pragma XLLEXPORT
+    try {
+        handle<fms::view<char>> h_(new win::mem_view<char>);
+        {
+            std::jthread jt([&url, &pheaders, &flags, &h_]() { return url_view(url, pheaders, flags, *h_); });
+        }
+        Excel(xlAsyncReturn, OPER(h_.get()), *phandle);
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+    }
 }
 
 AddIn xai_view(
