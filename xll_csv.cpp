@@ -148,9 +148,9 @@ AddIn xai_csv_parse_timeseries(
 	Function(XLL_FPX, "xll_csv_parse_timeseries", "CSV.PARSE.TIMESERIES")
 	.Arguments({
 		Arg(XLL_HANDLEX, "view", "is handle to a view."),
-		Arg(XLL_CSTRING, "_rs", "is an optional record separator. Default is newline '\\n'."),
-		Arg(XLL_CSTRING, "_fs", "is an optional field separator. Default is comma ','."),
-		Arg(XLL_CSTRING, "_esc", "is an optional escape character. Default is backslash '\\'."),
+		Arg(XLL_CSTRING4, "_rs", "is an optional record separator. Default is newline '\\n'."),
+		Arg(XLL_CSTRING4, "_fs", "is an optional field separator. Default is comma ','."),
+		Arg(XLL_CSTRING4, "_esc", "is an optional escape character. Default is backslash '\\'."),
 		})
 	.FunctionHelp("Parse view into a timeseries.")
 	.Category("CSV")
@@ -158,7 +158,7 @@ AddIn xai_csv_parse_timeseries(
 Convert comma separated values to a range. First column must be a date.
 )xyzyx")
 );
-_FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _e)
+_FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, const char* _rs, const char* _fs, const char* _e)
 {
 #pragma XLLEXPORT
 	static FPX o;
@@ -167,7 +167,7 @@ _FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, xcstr _rs, xcstr _fs, xcstr _
 		handle<fms::view<char>> h_(csv);
 		ensure(h_);
 
-		char rs = static_cast<char>(*_rs ? *_rs : '\n');
+		char rs = /*static_cast<char>*/(*_rs ? *_rs : '\n');
 		char fs = static_cast<char>(*_fs ? *_fs : ',');
 		char e = static_cast<char>(*_e ? *_e : '\\');
 		auto v = fms::char_view<const char>(h_->buf, h_->len);

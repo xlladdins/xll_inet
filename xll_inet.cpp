@@ -4,6 +4,25 @@
 
 using namespace xll;
 
+#ifdef _DEBUG
+
+Auto<Open> xao_inet_doc([]() {
+    xll::xll_url_base::set(INET_URL);
+    return TRUE;
+    });
+
+int inet_doc = []() {
+    Auto<OpenAfter> xaoa_inet_doc([] {
+        return xll::Documentation("INET", R"(
+Functions for retrieving and parsing URLs.
+)");
+    });
+
+    return TRUE;
+}();
+
+#endif // _DEBUG
+
 #define XLL_CATEGORY CATEGORY " Enum"
 
 #define XLL_TOPIC INET_INTERNET_FLAG_TOPIC
@@ -39,27 +58,20 @@ inline OPER headers(const OPER& o)
         h = o;
     }
     else if (o.is_multi()){
-        ensure(o.rows() == 2);
+        ensure(o.columns() == 2);
         for (unsigned i = 0; i < o.rows(); ++i) {
-            h &= o(0, i) & co & o(1, i) & rn;
+            h &= o(i, 0) & co & o(i, 1) & rn;
         }
         h &= rn;
     }
     else {
-        ensure(!"xll::headers: must be missing, nil, string, or two row range");
+        ensure(!__FUNCTION__ ": must be missing, nil, string, or two row range");
         h = ErrNA;
     }
 
     return h;
 }
 
-#ifdef _DEBUG
-Auto<OpenAfter> xaoa_inet_doc([]() {
-    return Documentation("INET", R"(
-Functions for retrieving and parsing URLs.
-)");
-});
-#endif // _DEBUG
 
 AddIn xai_inet_canonicalize_url(
     Function(XLL_LPOPER, "xll_inet_canonicalize_url", "INET.CANONICALIZE_URL")
@@ -439,7 +451,7 @@ Read all url data into memory using
 and
 <a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile">InternetReadFile</a>.
 <p>
-Headers are specified as a two row array of keys in the first row and values in the second.
+Headers are specified as a two column array of keys in the first row and values in the second.
 </p>
 )xyzyx")
 );
@@ -500,7 +512,6 @@ LPOPER WINAPI xll_view(HANDLEX h, LONG off, LONG len)
     try {
         handle<fms::view<char>> v(h);
         ensure(v || !__FUNCTION__ ": unrecognized handle");
-
 
         if (v->len > 3 and v->buf[0] == 0xEF) {
             ensure(v->buf[1] == 0xBB and v->buf[2] == 0xBF || !"VIEW: does not start with UTF-8 BOM");

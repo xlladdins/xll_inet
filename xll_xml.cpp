@@ -2,6 +2,7 @@
 #include <sstream>
 #include "libxml2.h"
 #include "xll/xll/xll.h"
+#include "fms_parse/win_mem_view.h"
 
 #define CATEGORY "XML"
 

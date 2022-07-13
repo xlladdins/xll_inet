@@ -10,6 +10,10 @@
 #define CATEGORY "Inet"
 #endif
 
+#ifndef INET_URL
+#define INET_URL "https://xlladdins.github.io/xll_inet/"
+#endif
+
 #define USER_AGENT "Mozilla/5.0 (Windows NT) Gecko/20100101 Firefox/89.0"
 
 // Define name with description. Define XLL_CATEGORY and XLL_TOPIC before using

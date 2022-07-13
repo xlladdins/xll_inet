@@ -1,0 +1,51 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="xll.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.css" integrity="sha384-Um5gpz1odJg5Z4HAmzPtgZKdTBHZdw8S29IecapCSB31ligYPhHQZMIlWLYQGVoc" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.js" integrity="sha384-YNHdsYkH6gMx9y3mRkmcJ2mFUjTd0qNQQvY9VYZgQd7DcN7env35GzlmFaZ23JGp" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/contrib/auto-render.min.js" integrity="sha384-vZTG03m+2yp6N6BNi5iM4rW4oIwk5DfcNdFfxkk9ZWpDriOkXX8voJBFrAO7MpVl" crossorigin="anonymous" onload="renderMathInElement(document.body, {fleqn: true});"></script><title></title>
+</head>
+<body>
+<h1>EVAL function</h1>
+<p>
+          This article describes the formula syntax of the
+          EVAL function.
+        </p>
+<h2>Description</h2>
+<p>Call xlfEvaluate on cell.</p>
+<h2>Syntax</h2>
+<p>EVAL(cell)
+        </p>
+<blockquote><table><tbody><tr>
+<td>cell</td>
+<td>is a cell to be evaluated.</td>
+</tr></tbody></table></blockquote>
+<p>
+
+The Excel function <code>xlfEvaluate</code> uses the Excel engine to evaluate
+its argument, just like pressing <code>F9</code> evaluates selected text
+in the formula bar. A naked string like <code>abc</code> is interpreted as
+a named range and it's corresponding value is returned. 
+To get <code>EVAL</code> to treat it like
+a string it must be enclosed in quotes, <code>"abc"</code>.
+If a string is a case-insensitive match with <code>TRUE</code> or <code>FALSE</code>
+it is converted to the appropriate boolean value. If the string matches a known
+Excel error then the string is converted to an error type. If the string
+looks like a function call then Excel calls the function and returns the result.
+Use an initial equal sign (<code>=</code>) to force Excel to evaluate the
+string as a function. To parse a string as a date use the <code>VALUE()</code> function.
+<p>
+Two dimensional ranges are enclosed in curly braces, use commas for
+field seperators, and semi-colons for record seperators. 
+For example, evaluating the string <code>{1.23,"abc";fAlSe,#N/A}</code>
+results in the 2x2 range consisting of the number <code>1.23</code>,
+the string <code>abc</code>, the boolean <code>FALSE</code> value,
+and a "not available" error type. Excel will not attempt to evaluate
+any item in a multi-dimensional range as a function.
+</p>
+<footer>
+          Return to <a href="index.html">index</a>.
+        </footer>
+</body>
+</html>

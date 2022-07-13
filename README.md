@@ -7,7 +7,7 @@ wants be when it grows up.
 A limitation of `WEBSERVICE` is that it returns a string. Strings in Excel are
 limited to 32767 = 2<sup>15</sup> - 1 characters. Most web pages are larger
 than that. Much larger. The function `\URL.VIEW(url)` returns a handle 
-to all the characters returned from the URL. It uses 
+to **all** the characters returned from the URL. It uses 
 [`InternetOpenUrl`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla)
 , [`InternetReadFile`](https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile)
 , and a memory mapped file to buffer data to memory.

@@ -1,0 +1,64 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="xll.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.css" integrity="sha384-Um5gpz1odJg5Z4HAmzPtgZKdTBHZdw8S29IecapCSB31ligYPhHQZMIlWLYQGVoc" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.js" integrity="sha384-YNHdsYkH6gMx9y3mRkmcJ2mFUjTd0qNQQvY9VYZgQd7DcN7env35GzlmFaZ23JGp" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/contrib/auto-render.min.js" integrity="sha384-vZTG03m+2yp6N6BNi5iM4rW4oIwk5DfcNdFfxkk9ZWpDriOkXX8voJBFrAO7MpVl" crossorigin="anonymous" onload="renderMathInElement(document.body, {fleqn: true});"></script><title></title>
+</head>
+<body>
+<h1>INET.CREATE_URL function</h1>
+<p>
+          This article describes the formula syntax of the
+          INET.CREATE_URL function.
+        </p>
+<h2>Description</h2>
+<p>creates a URL into its component parts.</p>
+<h2>Syntax</h2>
+<p>INET.CREATE_URL(scheme, host, _port, path, _user, _pass, _extra, _flag)
+        </p>
+<blockquote><table><tbody>
+<tr>
+<td>scheme</td>
+<td>is the URL scheme.</td>
+</tr>
+<tr>
+<td>host</td>
+<td>is the host.</td>
+</tr>
+<tr>
+<td>_port</td>
+<td>is the optional port number if scheme is not specified.</td>
+</tr>
+<tr>
+<td>path</td>
+<td>is the path.</td>
+</tr>
+<tr>
+<td>_user</td>
+<td>is the optional user.</td>
+</tr>
+<tr>
+<td>_pass</td>
+<td>is the optional password.</td>
+</tr>
+<tr>
+<td>_extra</td>
+<td>is the optional extra information.</td>
+</tr>
+<tr>
+<td>_flag</td>
+<td>is an optional flags that is either ICU_DECODE() or ICU_ESCAPE().</td>
+</tr>
+</tbody></table></blockquote>
+<p>
+
+This function creates a URL from the scheme, host, port, user, password, path, and extra information.
+If scheme is a one dimensional array then it uses the components in the specified order.
+If the scheme has two rows then the first row specifies the keys.
+</p>
+<footer>
+          Return to <a href="index.html">index</a>.
+        </footer>
+</body>
+</html>

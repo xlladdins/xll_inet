@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="xll.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.css" integrity="sha384-Um5gpz1odJg5Z4HAmzPtgZKdTBHZdw8S29IecapCSB31ligYPhHQZMIlWLYQGVoc" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.js" integrity="sha384-YNHdsYkH6gMx9y3mRkmcJ2mFUjTd0qNQQvY9VYZgQd7DcN7env35GzlmFaZ23JGp" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/contrib/auto-render.min.js" integrity="sha384-vZTG03m+2yp6N6BNi5iM4rW4oIwk5DfcNdFfxkk9ZWpDriOkXX8voJBFrAO7MpVl" crossorigin="anonymous" onload="renderMathInElement(document.body, {fleqn: true});"></script><title></title>
+</head>
+<body>
+<h1>HANDLE.TYPENAME function</h1>
+<p>
+          This article describes the formula syntax of the
+          HANDLE.TYPENAME function.
+        </p>
+<h2>Description</h2>
+<p>Return name of type corresponding to handle.</p>
+<h2>Syntax</h2>
+<p>HANDLE.TYPENAME(handle)
+        </p>
+<blockquote><table><tbody><tr>
+<td>handle</td>
+<td>is a handle.</td>
+</tr></tbody></table></blockquote>
+<p>
+
+Return the C++ RTTI <code>typeid(T).name()</code> of a handle created with <code>xll::handle&lt;T&gt;</code>.
+This uses runtime type information to return the name of the derived class of <code>T</code> used to initialize the handle.
+If the handle is not found then <code>#NUM!</code> is returned.
+</p>
+<footer>
+          Return to <a href="index.html">index</a>.
+        </footer>
+</body>
+</html>
