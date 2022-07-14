@@ -1,0 +1,48 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link href="xll.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.css" integrity="sha384-Um5gpz1odJg5Z4HAmzPtgZKdTBHZdw8S29IecapCSB31ligYPhHQZMIlWLYQGVoc" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.js" integrity="sha384-YNHdsYkH6gMx9y3mRkmcJ2mFUjTd0qNQQvY9VYZgQd7DcN7env35GzlmFaZ23JGp" crossorigin="anonymous"></script><script defer src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/contrib/auto-render.min.js" integrity="sha384-vZTG03m+2yp6N6BNi5iM4rW4oIwk5DfcNdFfxkk9ZWpDriOkXX8voJBFrAO7MpVl" crossorigin="anonymous" onload="renderMathInElement(document.body, {fleqn: true});"></script><title></title>
+</head>
+<body>
+<h1>_URL.VIEWA function</h1>
+<p>
+          This article describes the formula syntax of the
+          _URL.VIEWA function.
+        </p>
+<h2>Description</h2>
+<p>Asynchronously return a handle to the string returned by url.</p>
+<h2>Syntax</h2>
+<p>_URL.VIEWA(url, _headers, _flags)
+        </p>
+<blockquote><table><tbody>
+<tr>
+<td>url</td>
+<td>is a URL to read.</td>
+</tr>
+<tr>
+<td>_headers</td>
+<td>are optional headers to send to the HTTP server.</td>
+</tr>
+<tr>
+<td>_flags</td>
+<td>are optional flags from INTERNET_FLAGS_*. Default is 0.</td>
+</tr>
+</tbody></table></blockquote>
+<p>
+
+Read all url data into memory using
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetopenurla">InternetOpenUrl</a>
+and
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetreadfile">InternetReadFile</a>.
+<p>
+Headers are specified as a two column array of keys in the first row and values in the second.
+</p>
+</p>
+<footer>
+          Return to <a href="index.html">index</a>.
+        </footer>
+</body>
+</html>
