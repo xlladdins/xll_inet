@@ -494,7 +494,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
 }
 
 AddIn xai_inet_viewa(
-    Function(XLL_VOID, "xll_inet_read_file", "_URL.VIEWA")
+    Function(XLL_VOID, "xll_inet_read_file", "\\URL.VIEWA")
     .Arguments({
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
