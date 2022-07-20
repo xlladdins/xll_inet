@@ -1,8 +1,10 @@
 // xll_json.h - JSON to and from OPER
 #pragma once
-#include <iosfwd>
+#include <charconv>
+#include <iostream>
+#include <sstream>
 #include "xll/xll/xll.h"
-#include "xll_csv.h"
+#include "xll_parse.h"
 
 static inline const char xll_parse_json_doc[] = R"xyzyx(
 The function <code>JSON.PARSE(string)</code> parses the JSON <code>string</code> into an <code>OPER</code>.
@@ -112,7 +114,7 @@ namespace xll::json {
 	template<class X>
 	inline unsigned match(const XOPER<X>& o, const XOPER<X>& k)
 	{
-		auto i = Excel(xlfMatch, k[0], keys(o), XOPER<X>(0)); // exact
+		auto i = Excel(xlfMatch, k[0u], keys(o), XOPER<X>(0)); // exact
 		ensure(i.is_num());
 
 		return static_cast<unsigned>(i.val.num - 1);
@@ -126,10 +128,10 @@ namespace xll::json {
 		ensure(i.is_str());
 		ensure(i.val.str[0] and i.val.str[1] == '.');
 
-		auto v = view<T>(i.val.str + 2, i.val.str[0] - 1);
+		auto v = fms::char_view<T>(i.val.str + 2, i.val.str[0] - 1);
 
 		XOPER<X> is;
-		for (const auto& i_ : parse::iterator<T>(v, T('.'), T(0), T(0), T(0))) {
+		for (const auto& i_ : fms::parse::splitable<T>(v, T('.'), T(0), T(0), T(0))) {
 			XOPER<X> _i(i_.buf, i_.len);
 			if (_i.val.str[0] and isdigit(_i.val.str[1])) {
 				is.push_right(Excel(xlfValue, _i)); // might be #VALUE!
@@ -225,7 +227,7 @@ namespace xll::json {
 #endif // _DEBUG
 
 	template<class X, class T>
-	inline std::basic_ostream<T>& operator<<(std::basic_ostream<T>& os, const xll::XOPER<X>& x)
+	inline ::std::basic_ostream<T>& operator<<(::std::basic_ostream<T>& os, const xll::XOPER<X>& x)
 	{
 		switch (type(x)) {
 		case TYPE::Array:
@@ -278,7 +280,7 @@ namespace xll::json {
 	}
 
 	template<class X, class T = traits<X>::xchar>
-	inline std::basic_string<T> stringify(const xll::XOPER<X>& x)
+	inline ::std::basic_string<T> stringify(const xll::XOPER<X>& x)
 	{
 		std::basic_ostringstream<T> oss;
 
@@ -357,10 +359,10 @@ namespace xll::json::parse {
 
 	// forward declaration
 	template<class X, class T>
-	XOPER<X> value(fms::view<T>& v);
+	XOPER<X> value(fms::char_view<T>& v);
 
 	template<class X, class T>
-	inline XOPER<X> is_true(fms::view<T>& v)
+	inline XOPER<X> is_true(fms::char_view<T>& v)
 	{
 		if (v.len >= 4
 			and v.buf[0] == 't'
@@ -375,7 +377,7 @@ namespace xll::json::parse {
 	}
 
 	template<class X, class T>
-	inline XOPER<X> is_false(fms::view<T>& v)
+	inline XOPER<X> is_false(fms::char_view<T>& v)
 	{
 		if (v.len >= 5
 			and v.buf[0] == 'f'
@@ -391,7 +393,7 @@ namespace xll::json::parse {
 	}
 
 	template<class X, class T>
-	inline XOPER<X> is_null(fms::view<T>& v)
+	inline XOPER<X> is_null(fms::char_view<T>& v)
 	{
 		if (v.len >= 4
 			and v.buf[0] == 'n'
@@ -406,35 +408,37 @@ namespace xll::json::parse {
 	}
 
 	template<class X, class T>
-	inline XOPER<X> number(fms::view<T>& v)
+	inline XOPER<X> number(fms::char_view<T>& v)
 	{
-		double num = xll::parse::to_number<T>(v);
+		XOPER<X> o(v.buf, v.len);
+		xll::parse::convert(o, xltypeNum);
 
-		return isnan(num) ? XErrValue<X> : XOPER<X>(num);
+		return o;
 	}
 
 	// "\"str\"" => "str"
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> string(fms::view<T>& v)
+	inline XOPER<X> string(fms::char_view<T>& v)
 	{
-		auto str = xll::parse::skip<T>(v, '"', '"', '\\');
+		XOPER<X> o(v.buf, v.len);
+		o = Excel(xlfEvaluate, o);
 
-		return XOPER<X>(str.buf, str.len);
+		return o;
 	}
 
 	// object := "{ \"key\" : val , ... } "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> object(fms::view<T>& v)
+	inline XOPER<X> object(fms::char_view<T>& v)
 	{
 		XOPER<X> x;
 
-		v.skipws().eat('{');
-		while (v.skipws()) {
+		v.wstrim().eat('{');
+		while (v.wstrim()) {
 			auto key = string<X,T>(v);
-			v.skipws();
+			v.wstrim();
 			v.eat(':');
 			x.push_right(json::object<X>(key, value<X,T>(v)));
-			v.skipws();
+			v.wstrim();
 			if (v.front() == ',') {
 				v.eat(',');
 			}
@@ -449,12 +453,12 @@ namespace xll::json::parse {
 
 	// array := "[ value , ... ] "
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> array(fms::view<T>& v)
+	inline XOPER<X> array(fms::char_view<T>& v)
 	{
 		XOPER<X> x;
 
-		v.skipws().eat('[');
-		while (v.skipws() and v.front() != ']') {
+		v.wstrim().eat('[');
+		while (v.wstrim() and v.front() != ']') {
 			auto val = value<X, T>(v);
 			if (val.is_multi()) {
 				OPER xi(1, 1);
@@ -464,7 +468,7 @@ namespace xll::json::parse {
 			else {
 				x.push_right(val);
 			}
-			v.skipws();
+			v.wstrim();
 			if (v.front() == ',') {
 				v.eat(',');
 			}
@@ -480,9 +484,9 @@ namespace xll::json::parse {
 	}
 
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> value(fms::view<T>& v)
+	inline XOPER<X> value(fms::char_view<T>& v)
 	{
-		v.skipws();
+		v.wstrim();
 
 		if (v.front() == '{') {
 			return object<X,T>(v);
@@ -507,10 +511,10 @@ namespace xll::json::parse {
 	}
 
 	template<class X, class T = typename traits<X>::xchar>
-	inline XOPER<X> view(fms::view<T> v)
+	inline XOPER<X> view(fms::char_view<T> v)
 	{
-		XOPER<X> x = parse::value<X, T>(v.skipws());
-		ensure(!v.skipws());
+		XOPER<X> x = parse::value<X, T>(v.wstrim());
+		ensure(!v.wstrim());
 
 		return x;
 	}
@@ -539,45 +543,45 @@ namespace xll::json::parse {
 		
 	inline int test()
 	{
-#define PARSE_JSON_CHECK(a, b) { ensure(parse::view<XLOPERX>(fms::view(_T(a))) == b); }
+#define PARSE_JSON_CHECK(a, b) { ensure(parse::view<XLOPERX>(fms::char_view(_T(a))) == b); }
 		XLL_PARSE_JSON_VALUE(PARSE_JSON_CHECK)
 #undef PARSE_JSON_CHECK
 
 		{
-			fms::view t(_T("true"));
+			fms::char_view t(_T("true"));
 			ensure(is_true<XLOPERX>(t) == true);
 			ensure(!t);
 
-			fms::view f(_T("false"));
+			fms::char_view f(_T("false"));
 			ensure(is_false<XLOPERX>(f) == false);
 			ensure(!f);
 
-			fms::view n(_T("null"));
+			fms::char_view n(_T("null"));
 			ensure(is_null<XLOPERX>(n) == ErrNull);
 			ensure(!n);
 
 			{
-				fms::view num(_T("1.23foo"));
+				fms::char_view num(_T("1.23foo"));
 				ensure(number<XLOPERX>(num) == 1.23);
 				ensure(num.equal(_T("foo")));
 			}
 			{
-				fms::view num(_T("foo1.23"));
+				fms::char_view num(_T("foo1.23"));
 				ensure(number<XLOPERX>(num) == ErrValue);
 			}
 		}
 		{
-			fms::view str("\"str\"");
+			fms::char_view str("\"str\"");
 			ensure(parse::string<XLOPERX>(str) == "str");
 		}
 		{
-			fms::view str("\"s\\\"r\"");
+			fms::char_view str("\"s\\\"r\"");
 			ensure(parse::string<XLOPERX>(str) == "s\\\"r");
 			ensure(!str);
 		}
 		{
 			OPER x;
-			x = parse::view<XLOPERX>(fms::view(_T("{\"a\":{\"b\":\"cd\"}}")));
+			x = parse::view<XLOPERX>(fms::char_view(_T("{\"a\":{\"b\":\"cd\"}}")));
 			OPER i({ OPER("a"), OPER("b") });
 			ensure(json::index(x, i) == "cd");
 			ensure(json::index(x, i[0]) == OPER({ OPER("b"), OPER("cd") }).resize(2, 1));
@@ -591,7 +595,7 @@ namespace xll::json::parse {
 			    "}"
 			"},\"success\":1}";
 		OPER x;
-		x = parse::view<XLOPERX, const char>(fms::view(wd));
+		x = parse::view<XLOPERX, const char>(fms::char_view(wd));
 
 		return 0;
 	}

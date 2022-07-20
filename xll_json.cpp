@@ -1,6 +1,9 @@
+#ifdef _DEBUG
+#include <cassert>
+#endif
 #include "xll_json.h"
 
-using namespace fms;
+//using namespace fms;
 using namespace xll;
 
 using xcstr = xll::traits<XLOPERX>::xcstr;
@@ -127,14 +130,14 @@ LPOPER WINAPI xll_parse_json(LPOPER pjson)
 	try {
 		o = ErrNA;
 		if (pjson->is_num()) {
-			handle<fms::view<char>> h_(pjson->val.num);
+			handle<fms::char_view<char>> h_(pjson->val.num);
 			ensure(h_);
 			// convert from char to wchar if needed
-			o = json::parse::view<XLOPERX, char>(fms::view(h_->buf, h_->len));
+			o = json::parse::view<XLOPERX, char>(*h_);
 		}
 		else {
 			ensure(pjson->is_str());
-			o = json::parse::view<XLOPERX>(fms::view<const TCHAR>(pjson->val.str + 1, pjson->val.str[0]));
+			o = json::parse::view<XLOPERX>(fms::char_view<const TCHAR>(pjson->val.str + 1, pjson->val.str[0]));
 		}
 	}
 	catch (const std::exception& ex) {
