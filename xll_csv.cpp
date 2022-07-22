@@ -1,4 +1,7 @@
 // xll_csv.cpp - Parse CSV strings
+#ifdef _DEBUG
+#include <cassert>
+#endif
 #include "xll_parse.h"
 
 using namespace xll;
@@ -184,34 +187,15 @@ _FPX* WINAPI xll_csv_parse_timeseries(HANDLEX csv, const char* _rs, const char* 
 			for (auto field : fields) {
 				if (r == 0) {
 					c = static_cast<unsigned>(std::distance(fields.begin(), fields.end()));
+					ensure(i < c);
 					o.resize(1, c);
 				}
 				else if (i == 0) {
 					o.resize(r + 1, c);
 				}
-				ensure(i < c);
-				double x;
-				if (i == 0) {
-					auto [y, m, d] = fms::parse::to_ymd(field);
-					x = Excel(xlfDate, OPER(y), OPER(m), OPER(d)).as_num();
-					ensure(!field.is_error());
-					if (field and field.drop(1)) {
-						auto [hh, mm, ss] = fms::parse::to_hms(field);
-						ensure(!field.is_error());
-						if (field) {
-							auto [ho, mo] = fms::parse::to_off(field);
-							ensure(!field.is_error());
-							ensure(!field);
-							hh += ho;
-							mm += mo;
-						}
-						x += Excel(xlfTime, OPER(hh), OPER(mm), OPER(ss)).as_num();
-					}
-				}
-				else {
-					x = fms::parse::to<double>(field);
-				}
-				o(r, i) = x;
+				// date or number
+				OPER f = Excel(xlfEvaluate, OPER(field.buf, field.len));
+				o(r, i) = f.as_num();
 				++i;
 			}
 			++r;

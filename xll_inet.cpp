@@ -493,16 +493,45 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     return h;
 }
 
-AddIn xai_inet_viewa(
-    Function(XLL_VOID, "xll_inet_viewa", "\\URL.VIEWA")
+AddIn xai_mem_view_(
+    Function(XLL_HANDLEX, "xll_mem_view_", "\\MEM_VIEW")
     .Arguments({
+        Arg(XLL_LONG, "n", "allocate 2^n bytes initially. Default = 20.")
+        })
+    .Uncalced()
+    .Category(CATEGORY)
+    .FunctionHelp("Return a handle to a view of memory.")
+    .Documentation(R"xyzyx(
+Return handle to memory mapped file.
+)xyzyx")
+);
+HANDLEX WINAPI xll_mem_view_(LONG n)
+{
+    HANDLEX h = INVALID_HANDLEX;
+    
+    try {
+        if (n == 0) {
+            n = 20;
+        }
+        handle<fms::view<char>> h_(new win::mem_view<char>(INVALID_HANDLE_VALUE, 1 << n));
+        h = h_.get();
+    }
+    catch (const std::exception& ex) {
+        XLL_ERROR(ex.what());
+    }
+
+    return h;
+}
+
+AddIn xai_inet_viewa(
+    Function(XLL_VOID, "xll_inet_viewa", "URL.VIEWA")
+    .Arguments({
+        Arg(XLL_HANDLEX, "h", "is a handle returned by \\MEM_VIEW."),
         Arg(XLL_CSTRING, "url", "is a URL to read."),
         Arg(XLL_LPOPER, "_headers", "are optional headers to send to the HTTP server."),
         Arg(XLL_LONG, "_flags", "are optional flags from INTERNET_FLAGS_*. Default is 0.")
         })
     .Asynchronous()
-    //.ThreadSafe()
-    .Uncalced()
     .Category(CATEGORY)
     .FunctionHelp("Asynchronously return a handle to the string returned by url.")
     .Documentation(R"xyzyx(
@@ -515,11 +544,11 @@ Headers are specified as a two column array of keys in the first row and values 
 </p>
 )xyzyx")
 );
-void WINAPI xll_inet_viewa(LPCTSTR url, LPOPER pheaders, LONG flags, LPXLOPERX phandle)
+void WINAPI xll_inet_viewa(HANDLEX h, LPCTSTR url, LPOPER pheaders, LONG flags, LPXLOPERX phandle)
 {
 #pragma XLLEXPORT
     try {
-        handle<fms::view<char>> h_(new win::mem_view<char>);
+        handle<fms::view<char>> h_(h);
         {
             std::jthread jt([&url, &pheaders, &flags, &h_]() { return url_view(url, pheaders, flags, *h_); });
         }
