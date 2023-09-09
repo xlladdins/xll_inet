@@ -493,6 +493,7 @@ HANDLEX WINAPI xll_inet_read_file(LPCTSTR url, LPOPER pheaders, LONG flags)
     return h;
 }
 
+#if 0
 AddIn xai_mem_view_(
     Function(XLL_HANDLEX, "xll_mem_view_", "\\MEM_VIEW")
     .Arguments({
@@ -558,7 +559,7 @@ void WINAPI xll_inet_viewa(HANDLEX h, LPCTSTR url, LPOPER pheaders, LONG flags, 
         XLL_ERROR(ex.what());
     }
 }
-
+#endif // 0
 AddIn xai_view(
     Function(XLL_LPOPER, "xll_view", "VIEW")
     .Arguments({

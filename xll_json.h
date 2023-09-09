@@ -540,7 +540,7 @@ namespace xll::json::parse {
 	//	X("[{\"a\":1},false,null]", json::array(json::object("a", 1), false, XErrNull<XLOPERX>)) \
 	//	X("null", OPER::Err::Null) \
 	//	X("[{\"a\":1},false,null]", json::array(json::object("a", 1), false, OPER::Err::Null)) \
-		
+	
 	inline int test()
 	{
 #define PARSE_JSON_CHECK(a, b) { ensure(parse::view<XLOPERX>(fms::char_view(_T(a))) == b); }
