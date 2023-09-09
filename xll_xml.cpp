@@ -392,7 +392,7 @@ equivalent to <code>XML.NODE.NEXT(node, XML_ELEMENT_NODE())</code>.
 LPOPER WINAPI xll_xml_node_next_element(HANDLEX pnode)
 {
 #pragma XLLEXPORT
-	OPER element(XML_ELEMENT_NODE);
+	OPER element(static_cast<int>(XML_ELEMENT_NODE));
 
 	return xll_xml_node_next(pnode, &element);
 }
